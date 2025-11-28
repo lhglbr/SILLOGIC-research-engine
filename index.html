@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SILLOGIC - Research Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.10.1/dist/style.css" />
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "three": "https://esm.sh/three@0.160.0",
+    "@google/genai": "https://esm.sh/@google/genai",
+    "lucide-react": "https://esm.sh/lucide-react@0.300.0",
+    "reactflow": "https://esm.sh/reactflow@11.10.1?external=react,react-dom",
+    "dagre": "https://esm.sh/dagre@0.8.5",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: transparent; /* Changed to transparent to allow ParticleBackground to show */
+        color: #e5e5e5;
+        overflow: hidden; /* Manage scroll within app */
+        margin: 0;
+        padding: 0;
+      }
+      .font-mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0f0f0f; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555; 
+      }
+      .glass-panel {
+        background: rgba(10, 10, 15, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      
+      /* React Flow Overrides for Dark Theme */
+      .react-flow__node {
+        border-radius: 12px;
+        border: none;
+      }
+      .react-flow__handle {
+        background: #555;
+        width: 8px;
+        height: 8px;
+      }
+      .react-flow__controls {
+        background: #111;
+        border: 1px solid #333;
+      }
+      .react-flow__controls-button {
+        background: #111;
+        border-bottom: 1px solid #333;
+        fill: #fff;
+      }
+      .react-flow__controls-button:hover {
+        background: #222;
+      }
+      .react-flow__attribution {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

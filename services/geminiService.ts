@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ResearchField, ResearchTask, ModelProvider } from "../types";
 
@@ -102,20 +103,21 @@ export const streamResponse = async (
   history: { role: string; parts: { text: string }[] }[],
   prompt: string,
   files: File[],
-  context: { field: ResearchField; task: ResearchTask; model: ModelProvider },
+  context: { field: ResearchField; task: ResearchTask },
+  modelId: ModelProvider,
   onChunk: (text: string) => void
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  let modelName: string = context.model;
+  let modelName: string = modelId;
   let config: any = {
     systemInstruction: getSystemInstruction(context.field, context.task),
   };
 
-  if (context.model === ModelProvider.GEMINI_THINKING) {
+  if (modelId === ModelProvider.GEMINI_THINKING) {
     modelName = 'gemini-3-pro-preview';
     config.thinkingConfig = { thinkingBudget: 1024 };
-  } else if (context.model === ModelProvider.GEMINI_PRO) {
+  } else if (modelId === ModelProvider.GEMINI_PRO) {
       modelName = 'gemini-3-pro-preview';
   } else {
       modelName = 'gemini-2.5-flash';
@@ -139,8 +141,7 @@ export const streamResponse = async (
     });
 
     const result = await chat.sendMessageStream({ 
-      role: 'user',
-      parts: currentParts 
+      message: currentParts
     });
     
     let fullText = "";

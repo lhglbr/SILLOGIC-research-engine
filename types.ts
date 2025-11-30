@@ -1,3 +1,4 @@
+
 export enum AppView {
   LANDING = 'LANDING',
   FIELD_SELECT = 'FIELD_SELECT',
@@ -28,16 +29,25 @@ export enum ModelProvider {
   GEMINI_THINKING = 'gemini-3-pro-preview-thinking', // Internal flag for thinking config
 }
 
+export interface MultiModelResponse {
+  modelId: ModelProvider;
+  modelName: string;
+  content: string;
+  isThinking: boolean;
+  isDone: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
-  content: string;
+  content: string; // Fallback content or user message
   timestamp: number;
-  isThinking?: boolean;
+  isThinking?: boolean; // Legacy single model flag
+  multiResponses?: MultiModelResponse[]; // Array for parallel responses
 }
 
 export interface UserContext {
   field?: ResearchField;
   task?: ResearchTask;
-  model: ModelProvider;
+  models: ModelProvider[]; // Changed to array for multi-select
 }

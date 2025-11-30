@@ -1,8 +1,9 @@
+
 import React, { useState, useMemo } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
 import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check } from 'lucide-react';
 
 // --- Configuration per Field ---
 const FIELD_CONFIG = {
@@ -91,7 +92,7 @@ const FIELD_CONFIG = {
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.LANDING);
   const [context, setContext] = useState<UserContext>({
-    model: ModelProvider.GEMINI_FLASH
+    models: [ModelProvider.GEMINI_FLASH]
   });
 
   const activeTheme = context.field ? FIELD_CONFIG[context.field] : FIELD_CONFIG[ResearchField.GENERAL];
@@ -101,6 +102,19 @@ const App: React.FC = () => {
     { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Complex Reasoning" },
     { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Deep Logic & Proof" },
   ];
+
+  const toggleModel = (modelId: ModelProvider) => {
+    setContext(prev => {
+      const current = prev.models;
+      if (current.includes(modelId)) {
+        if (current.length === 1) return prev; // Must have at least one
+        return { ...prev, models: current.filter(id => id !== modelId) };
+      } else {
+        if (current.length >= 3) return prev; // Max 3
+        return { ...prev, models: [...current, modelId] };
+      }
+    });
+  };
 
   // --- Views ---
 
@@ -195,21 +209,33 @@ const App: React.FC = () => {
 
           {/* Models Column */}
           <div className="space-y-4">
-            <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-4">Engine</h3>
+            <div className="flex justify-between items-center mb-4">
+               <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold">Engine Cluster</h3>
+               <span className="text-xs text-gray-500">Select up to 3 for comparison</span>
+            </div>
             <div className="space-y-3">
-              {models.map((model) => (
-                <button
-                  key={model.id}
-                  onClick={() => setContext(prev => ({ ...prev, model: model.id }))}
-                  className={`w-full glass-panel p-4 rounded-xl text-left transition-all border flex justify-between items-center ${context.model === model.id ? 'bg-white/10 border-white/50' : 'border-white/5 hover:bg-white/5'}`}
-                >
-                  <div>
-                    <div className="text-sm font-semibold text-white">{model.name}</div>
-                    <div className="text-xs text-gray-500">{model.desc}</div>
-                  </div>
-                  {context.model === model.id && <div className={`w-2 h-2 rounded-full bg-${activeTheme.color}-500`}></div>}
-                </button>
-              ))}
+              {models.map((model) => {
+                const isSelected = context.models.includes(model.id);
+                return (
+                  <button
+                    key={model.id}
+                    onClick={() => toggleModel(model.id)}
+                    className={`w-full glass-panel p-4 rounded-xl text-left transition-all border flex justify-between items-center ${isSelected ? 'bg-white/10 border-white/50' : 'border-white/5 hover:bg-white/5'}`}
+                  >
+                    <div>
+                      <div className="text-sm font-semibold text-white">{model.name}</div>
+                      <div className="text-xs text-gray-500">{model.desc}</div>
+                    </div>
+                    {isSelected ? (
+                       <div className={`w-5 h-5 rounded flex items-center justify-center bg-${activeTheme.color}-500 text-black`}>
+                         <Check size={14} strokeWidth={3} />
+                       </div>
+                    ) : (
+                       <div className="w-5 h-5 rounded border border-gray-600"></div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

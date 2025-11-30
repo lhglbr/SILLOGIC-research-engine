@@ -1,19 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import ReactFlow, { 
-  Node, 
-  Edge, 
-  Controls, 
-  Background, 
-  useNodesState, 
-  useEdgesState, 
-  Handle, 
-  Position,
-  useReactFlow,
-  ReactFlowProvider,
-  MarkerType
-} from 'reactflow';
-import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2 } from 'lucide-react';
-import { ChatMessage, UserContext } from '../types';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu } from 'lucide-react';
+import { ChatMessage, UserContext, ModelProvider } from '../types';
 import { streamResponse } from '../services/geminiService';
 
 interface ChatInterfaceProps {
@@ -22,201 +10,156 @@ interface ChatInterfaceProps {
   onBack: () => void;
 }
 
-// --- Theme Colors ---
-const THEME_COLORS: Record<string, string> = {
-  violet: '#8b5cf6',
-  emerald: '#10b981',
-  cyan: '#06b6d4',
-  amber: '#f59e0b',
-  rose: '#f43f5e',
-  blue: '#3b82f6',
-};
+// Helper to get friendly name
+const getModelDisplayName = (id: ModelProvider) => {
+    switch(id) {
+        case ModelProvider.GEMINI_FLASH: return "Gemini 2.5 Flash";
+        case ModelProvider.GEMINI_PRO: return "Gemini 3.0 Pro";
+        case ModelProvider.GEMINI_THINKING: return "Gemini 3.0 Thinking";
+        default: return id;
+    }
+}
 
-const THEME_RGBS: Record<string, string> = {
-  violet: '139, 92, 246',
-  emerald: '16, 185, 129',
-  cyan: '6, 182, 212',
-  amber: '245, 158, 11',
-  rose: '244, 63, 94',
-  blue: '59, 130, 246',
-};
+interface MessageBubbleProps {
+  message: ChatMessage;
+  themeColor: string;
+  onCopy: (text: string) => void;
+  onExport: () => void;
+}
 
-// --- Custom Node Components ---
-
-const UserNode = ({ data }: { data: { label: string; themeColor: string; files?: string[] } }) => {
-  const color = THEME_COLORS[data.themeColor] || '#fff';
-  return (
-    <div className="relative min-w-[300px] max-w-[400px]">
-      <div className={`p-4 rounded-2xl bg-gray-900/80 backdrop-blur-md border border-gray-700 shadow-xl`}>
-         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-800">
-            <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold">U</div>
-            <span className="text-xs font-mono text-gray-400 uppercase tracking-wider">Research Query</span>
-         </div>
-         {data.files && data.files.length > 0 && (
-             <div className="mb-3 flex flex-wrap gap-2">
-                 {data.files.map((f, i) => (
-                     <span key={i} className="text-[10px] px-2 py-1 bg-gray-800 rounded text-gray-300 flex items-center gap-1">
-                         <FileText size={10} /> {f}
-                     </span>
-                 ))}
-             </div>
-         )}
-         <div className="text-sm text-gray-200 font-medium whitespace-pre-wrap leading-relaxed">
-            {data.label}
-         </div>
-      </div>
-      <Handle type="source" position={Position.Right} className="!bg-gray-500 !w-3 !h-3 !-right-1.5" />
-    </div>
-  );
-};
-
-const ModelNode = ({ data }: { data: { label: string; themeColor: string; isThinking?: boolean } }) => {
-  const color = THEME_COLORS[data.themeColor] || '#3b82f6';
-  const rgb = THEME_RGBS[data.themeColor] || '59, 130, 246';
-  
-  return (
-    <div className="relative min-w-[400px] max-w-[600px]">
-      <Handle type="target" position={Position.Left} className="!bg-gray-500 !w-3 !h-3 !-left-1.5" />
-      <div className={`rounded-2xl bg-[#0a0a0f]/90 backdrop-blur-xl border border-${data.themeColor}-500/30 shadow-2xl shadow-${data.themeColor}-900/20 overflow-hidden`}>
-         <div className={`px-4 py-3 bg-${data.themeColor}-900/20 border-b border-${data.themeColor}-500/20 flex justify-between items-center`}>
-            <div className="flex items-center gap-2">
-                <div className={`p-1 rounded bg-${data.themeColor}-500/20 text-${data.themeColor}-400`}>
-                    <BrainCircuit size={14} />
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, themeColor, onCopy, onExport }) => {
+    const isUser = message.role === 'user';
+    
+    if (isUser) {
+        return (
+            <div className="flex justify-end mb-8 pl-12">
+                <div className="max-w-2xl w-full">
+                    <div className="flex items-center justify-end gap-2 mb-2">
+                        <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">Research Query</span>
+                        <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold">U</div>
+                    </div>
+                    <div className="p-5 rounded-2xl bg-gray-900/80 backdrop-blur-md border border-gray-700 shadow-xl">
+                        <div className="text-sm text-gray-200 font-medium whitespace-pre-wrap leading-relaxed">
+                            {message.content}
+                        </div>
+                    </div>
                 </div>
-                <span className={`text-xs font-mono text-${data.themeColor}-300 uppercase tracking-wider`}>SILLOGIC INTELLIGENCE</span>
             </div>
-            <div className="flex gap-2">
-                <button className="text-gray-500 hover:text-white transition-colors" title="Copy"><FileText size={14} /></button>
-                <button className="text-gray-500 hover:text-white transition-colors" title="Export"><Download size={14} /></button>
+        );
+    }
+
+    // Model Message (potentially parallel)
+    const isMulti = message.multiResponses && message.multiResponses.length > 0;
+
+    return (
+        <div className="flex justify-start mb-12 pr-4 w-full">
+            <div className="w-full">
+                 <div className="flex items-center gap-2 mb-2">
+                    <div className={`p-1 rounded bg-${themeColor}-500/20 text-${themeColor}-400`}>
+                        <BrainCircuit size={14} />
+                    </div>
+                    <span className={`text-xs font-mono text-${themeColor}-300 uppercase tracking-wider`}>
+                        {isMulti ? `SILLOGIC CLUSTER (${message.multiResponses?.length} CORES)` : 'SILLOGIC INTELLIGENCE'}
+                    </span>
+                 </div>
+                 
+                 {isMulti ? (
+                     <div className={`grid gap-4 ${message.multiResponses!.length === 3 ? 'grid-cols-3' : message.multiResponses!.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        {message.multiResponses!.map((res, idx) => (
+                             <div key={res.modelId} className={`flex flex-col rounded-2xl bg-[#0a0a0f]/90 backdrop-blur-xl border border-${themeColor}-500/30 shadow-2xl shadow-${themeColor}-900/10 overflow-hidden`}>
+                                {/* Sub-Toolbar */}
+                                <div className={`px-4 py-2 bg-${themeColor}-900/10 border-b border-${themeColor}-500/20 flex justify-between items-center`}>
+                                    <div className="flex items-center gap-2">
+                                        <Cpu size={12} className={`text-${themeColor}-400`} />
+                                        <span className="text-[10px] text-white font-bold tracking-wider font-mono uppercase">{res.modelName}</span>
+                                    </div>
+                                    <button onClick={() => onCopy(res.content)} className="text-gray-500 hover:text-white transition-colors p-1" title="Copy">
+                                        <Copy size={12} />
+                                    </button>
+                                </div>
+                                
+                                <div className="p-6 flex-1 min-h-[200px]">
+                                    {res.isThinking ? (
+                                        <div className="flex items-center gap-2 text-gray-500 animate-pulse mt-4">
+                                            <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></span>
+                                            <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce delay-75"></span>
+                                            <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce delay-150"></span>
+                                        </div>
+                                    ) : null}
+                                    
+                                    <div className="prose prose-invert prose-sm max-w-none text-gray-300 font-light leading-7 whitespace-pre-wrap font-sans">
+                                        {res.content}
+                                    </div>
+                                </div>
+                             </div>
+                        ))}
+                     </div>
+                 ) : (
+                     /* Legacy single response fallback */
+                     <div className={`rounded-2xl bg-[#0a0a0f]/90 backdrop-blur-xl border border-${themeColor}-500/30 shadow-2xl shadow-${themeColor}-900/10 overflow-hidden`}>
+                        <div className={`px-4 py-2 bg-${themeColor}-900/10 border-b border-${themeColor}-500/20 flex justify-between items-center`}>
+                            <div className="text-[10px] text-gray-500 font-mono">
+                                {new Date(message.timestamp).toLocaleTimeString()}
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => onCopy(message.content)} className="text-gray-500 hover:text-white transition-colors p-1" title="Copy">
+                                    <Copy size={14} />
+                                </button>
+                                <button onClick={onExport} className="text-gray-500 hover:text-white transition-colors p-1" title="Export Thread">
+                                    <FileDown size={14} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-8">
+                            {message.isThinking ? (
+                                <div className="flex items-center gap-3 text-gray-400 animate-pulse">
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></span>
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+                                    <span className="text-sm font-mono">Processing Logic...</span>
+                                </div>
+                            ) : (
+                                <div className="prose prose-invert prose-sm max-w-none text-gray-300 font-light leading-7 whitespace-pre-wrap font-sans">
+                                    {message.content}
+                                </div>
+                            )}
+                        </div>
+                     </div>
+                 )}
             </div>
-         </div>
-         
-         <div className="p-6">
-            <div className="text-sm text-gray-300 font-light leading-7 whitespace-pre-wrap font-sans">
-                {data.label || <span className="animate-pulse flex items-center gap-2"><span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce"></span> Thinking...</span>}
-            </div>
-         </div>
-      </div>
-    </div>
-  );
+        </div>
+    );
 };
-
-const nodeTypes = {
-  userNode: UserNode,
-  modelNode: ModelNode,
-};
-
-// --- Layout Hook ---
-// Calculates positions: Users on Left (x=0), Models on Right (x=500)
-// Vertically stacked based on the height of the previous row
-const useAutoLayout = (nodes: Node[], setNodes: React.Dispatch<React.SetStateAction<Node[]>>) => {
-    useEffect(() => {
-        let currentY = 50;
-        const GAP_Y = 50;
-        const updates: {id: string, position: {x: number, y: number}}[] = [];
-        let changed = false;
-
-        // Group by "conversation turn" (User -> Model) roughly by ID order
-        // This assumes alternating IDs or structured flow. 
-        // We'll iterate simply: if it's a user node, place at left. If model, place at right, same Y.
-        // Then increment Y by the MAX height of that row.
-        
-        // Since we don't know explicit pairs, we can assume a sequential flow.
-        
-        const sortedNodes = [...nodes].sort((a, b) => {
-            // Sort roughly by Y if already set, or ID/creation time
-             return parseInt(a.id) - parseInt(b.id); // Assuming timestamp IDs
-        });
-
-        // We need to wait for dimensions to be measured by React Flow
-        // However, we can just stack them for now based on index if dimensions aren't ready
-        // Real logic: Find the previous node, see its Y + Height.
-        
-        // Simple 2-column Timeline Layout
-        // We will process nodes in pairs if possible
-        
-        let lastUserY = 0;
-        let lastUserHeight = 0;
-        
-        for (let i = 0; i < sortedNodes.length; i++) {
-            const node = sortedNodes[i];
-            const isUser = node.type === 'userNode';
-            
-            // Dimensions are null initially
-            const height = node.height || 150; 
-            
-            let x = 0;
-            let y = 0;
-
-            if (isUser) {
-                // User Node starts a new "Row"
-                // Y is after the previous interactions
-                // But specifically, after the previous User node + its answer
-                if (i > 0) {
-                     // Find the bottom-most point of previous nodes
-                     const prevNodes = sortedNodes.slice(0, i);
-                     const maxY = Math.max(...prevNodes.map(n => n.position.y + (n.height || 150)));
-                     currentY = maxY + GAP_Y;
-                }
-                x = 0;
-                y = currentY;
-                lastUserY = y;
-                lastUserHeight = height;
-            } else {
-                // Model Node
-                // Should align with the last User Node
-                x = 500; 
-                y = lastUserY; // Align tops
-            }
-
-            if (Math.abs(node.position.x - x) > 1 || Math.abs(node.position.y - y) > 1) {
-                updates.push({ id: node.id, position: { x, y } });
-                changed = true;
-            }
-        }
-
-        if (changed) {
-            setNodes((nds) => 
-                nds.map((n) => {
-                    const update = updates.find(u => u.id === n.id);
-                    return update ? { ...n, position: update.position } : n;
-                })
-            );
-        }
-    }, [nodes.length, nodes.map(n => n.height).join(','), setNodes]); // Recalculate when node count or heights change
-};
-
-
-// --- Main Component ---
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBack }) => {
-  // State
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initial Message
+  // Initialize Welcome Message
   useEffect(() => {
-     if (nodes.length === 0) {
-        const welcomeId = Date.now().toString();
-        const welcomeNode: Node = {
-            id: welcomeId,
-            type: 'modelNode',
-            position: { x: 500, y: 50 },
-            data: { 
-                label: `### ${context.field} Workspace Initialized\n\nI am ready to assist with **${context.task}**.\n\nUpload papers (PDF), images, or datasets to begin analysis.`,
-                themeColor 
-            },
-        };
-        setNodes([welcomeNode]);
-     }
+    if (messages.length === 0) {
+        setMessages([{
+            id: 'system-welcome',
+            role: 'model',
+            content: `### ${context.field} Workspace Initialized\n\nI am ready to assist with **${context.task}** using **${context.models.map(getModelDisplayName).join(', ')}**.\n\nUpload papers (PDF), images, or datasets to begin analysis.`,
+            timestamp: Date.now()
+        }]);
+    }
   }, []);
 
-  // Use layout hook
-  useAutoLayout(nodes, setNodes);
+  // Auto-scroll
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
 
   // File Handling
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,87 +169,137 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
   };
   const removeFile = (index: number) => setFiles(prev => prev.filter((_, i) => i !== index));
 
+  // Copy Functionality
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Failed to copy!', err);
+    }
+  };
+
+  // Export Functionality
+  const exportChat = () => {
+    const text = messages.map(m => {
+        if (m.multiResponses) {
+            let out = `[MODEL CLUSTER] ${new Date(m.timestamp).toLocaleTimeString()}\n`;
+            m.multiResponses.forEach(r => {
+                out += `\n--- ${r.modelName} ---\n${r.content}\n`;
+            });
+            return out;
+        }
+        return `[${m.role.toUpperCase()}] ${new Date(m.timestamp).toLocaleTimeString()}\n${m.content}\n\n`
+    }).join('========================================\n\n');
+    
+    const blob = new Blob([text], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SILLOGIC_${context.field}_${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Submit Handler
   const handleSubmit = async () => {
     if ((!input.trim() && files.length === 0) || isLoading) return;
 
-    const userMsgId = Date.now().toString();
-    const modelMsgId = (Date.now() + 1).toString();
-    const currentInput = input;
+    const userText = input;
     const currentFiles = [...files];
+    const userMsgId = Date.now().toString();
     
     // Clear Input
     setInput('');
     setFiles([]);
     setIsLoading(true);
 
-    // 1. Create User Node
-    const userNode: Node = {
+    // 1. Add User Message
+    const userMsg: ChatMessage = {
         id: userMsgId,
-        type: 'userNode',
-        position: { x: 0, y: 0 }, // Layout hook will fix
-        data: { 
-            label: currentInput, 
-            themeColor,
-            files: currentFiles.map(f => f.name)
-        },
+        role: 'user',
+        content: userText + (currentFiles.length > 0 ? `\n[Attached: ${currentFiles.map(f => f.name).join(', ')}]` : ''),
+        timestamp: Date.now()
     };
+    
+    setMessages(prev => [...prev, userMsg]);
 
-    // 2. Create Model Node (Loading)
-    const modelNode: Node = {
+    // 2. Add Placeholder Model Message (Multi-Model Container)
+    const modelMsgId = (Date.now() + 1).toString();
+    
+    const multiResponses = context.models.map(m => ({
+        modelId: m,
+        modelName: getModelDisplayName(m),
+        content: '',
+        isThinking: true,
+        isDone: false
+    }));
+
+    const modelMsg: ChatMessage = {
         id: modelMsgId,
-        type: 'modelNode',
-        position: { x: 500, y: 0 }, // Layout hook will fix
-        data: { label: '', themeColor, isThinking: true },
+        role: 'model',
+        content: '', // Not used for multi
+        timestamp: Date.now(),
+        isThinking: true,
+        multiResponses: multiResponses
     };
+    setMessages(prev => [...prev, modelMsg]);
 
-    // 3. Create Edge
-    const edge: Edge = {
-        id: `e-${userMsgId}-${modelMsgId}`,
-        source: userMsgId,
-        target: modelMsgId,
-        animated: true,
-        style: { stroke: THEME_COLORS[themeColor] || '#fff', strokeWidth: 2 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: THEME_COLORS[themeColor] || '#fff' },
-    };
-
-    setNodes((nds) => [...nds, userNode, modelNode]);
-    setEdges((eds) => [...eds, edge]);
-
-    // 4. Stream Response
-    // Construct history for API
-    const history = nodes
-        .filter(n => n.type === 'userNode' || n.type === 'modelNode')
-        .map(n => ({
-            role: n.type === 'userNode' ? 'user' : 'model',
-            parts: [{ text: n.data.label }]
-        }))
-        .filter(h => h.parts[0].text !== ''); // Filter empty pending
+    // 3. Parallel API Calls
+    const history = messages.filter(m => !m.multiResponses).map(m => ({
+        role: m.role,
+        parts: [{ text: m.content }]
+    }));
 
     try {
-        await streamResponse(
-            history,
-            currentInput,
-            currentFiles,
-            context as Required<UserContext>,
-            (chunk) => {
-                setNodes((nds) => nds.map(n => {
-                    if (n.id === modelMsgId) {
-                        return {
-                            ...n,
-                            data: {
-                                ...n.data,
-                                label: n.data.label + chunk,
-                                isThinking: false
-                            }
-                        };
-                    }
-                    return n;
-                }));
-            }
-        );
+        const promises = context.models.map(async (modelId) => {
+            await streamResponse(
+                history,
+                userText,
+                currentFiles,
+                { field: context.field!, task: context.task! },
+                modelId,
+                (chunk) => {
+                    setMessages(prev => prev.map(msg => {
+                        if (msg.id === modelMsgId && msg.multiResponses) {
+                            const updatedResponses = msg.multiResponses.map(res => {
+                                if (res.modelId === modelId) {
+                                    return { 
+                                        ...res, 
+                                        content: res.content + chunk, 
+                                        isThinking: false 
+                                    };
+                                }
+                                return res;
+                            });
+                            return { ...msg, multiResponses: updatedResponses };
+                        }
+                        return msg;
+                    }));
+                }
+            );
+            
+            // Mark individual model as done
+             setMessages(prev => prev.map(msg => {
+                if (msg.id === modelMsgId && msg.multiResponses) {
+                    const updatedResponses = msg.multiResponses.map(res => {
+                        if (res.modelId === modelId) {
+                            return { ...res, isDone: true, isThinking: false };
+                        }
+                        return res;
+                    });
+                    // Check if all are done
+                    const allDone = updatedResponses.every(r => r.isDone);
+                    return { ...msg, multiResponses: updatedResponses, isThinking: !allDone };
+                }
+                return msg;
+            }));
+        });
+
+        await Promise.all(promises);
+
     } catch (e) {
-        console.error(e);
+        console.error("Parallel execution error", e);
+        // Error handling is managed individually in streamResponse but we can add global notification here if needed
     } finally {
         setIsLoading(false);
     }
@@ -322,7 +315,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
   return (
     <div className="flex flex-col h-screen w-full bg-[#050505] relative z-10 border-x border-white/5">
       {/* Header */}
-      <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#050505]/90 backdrop-blur-sm z-30 absolute top-0 w-full">
+      <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#050505]/95 backdrop-blur-sm z-30 absolute top-0 w-full shadow-lg">
         <div className="flex items-center space-x-4">
           <button 
             onClick={onBack}
@@ -336,44 +329,41 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400 font-mono">{context.task}</span>
               <span className="text-xs text-gray-600">•</span>
-              <span className={`text-xs text-${themeColor}-300 font-mono opacity-80`}>{context.model}</span>
+              <span className={`text-xs text-${themeColor}-300 font-mono opacity-80`}>{context.models.length} Model(s) Active</span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-4 text-xs font-mono text-gray-500">
-             <span className="flex items-center gap-1"><Maximize2 size={12}/> INFINITE CANVAS ENABLED</span>
+             <button onClick={exportChat} className="flex items-center gap-2 hover:text-white transition-colors">
+                <Download size={14} /> EXPORT REPORT
+             </button>
         </div>
       </div>
 
-      {/* React Flow Area */}
-      <div className="flex-1 w-full h-full">
-         <ReactFlowProvider>
-             <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                nodeTypes={nodeTypes}
-                fitView
-                minZoom={0.1}
-                maxZoom={2}
-                defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-                className="bg-transparent"
-             >
-                <Background color="#222" gap={20} size={1} />
-                <Controls className="!bg-gray-900 !border-gray-800 !fill-white" />
-             </ReactFlow>
-         </ReactFlowProvider>
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto pt-24 pb-32 px-4 md:px-8 scroll-smooth">
+         <div className="max-w-[95%] mx-auto">
+             {messages.map((msg) => (
+                 <MessageBubble 
+                   key={msg.id} 
+                   message={msg} 
+                   themeColor={themeColor}
+                   onCopy={copyToClipboard}
+                   onExport={exportChat}
+                 />
+             ))}
+             <div ref={messagesEndRef} />
+         </div>
       </div>
 
       {/* Input Overlay */}
-      <div className="p-4 bg-[#050505] border-t border-white/10 relative z-30">
+      <div className="absolute bottom-0 w-full p-6 bg-gradient-to-t from-[#050505] via-[#050505] to-transparent z-30">
         
         {/* File Chips */}
         {files.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3">
+            <div className="flex flex-wrap gap-2 mb-3 max-w-4xl mx-auto">
                 {files.map((file, i) => (
-                    <div key={i} className={`flex items-center gap-2 bg-${themeColor}-900/30 border border-${themeColor}-500/30 px-3 py-1 rounded-full text-xs text-${themeColor}-200`}>
+                    <div key={i} className={`flex items-center gap-2 bg-${themeColor}-900/30 border border-${themeColor}-500/30 px-3 py-1 rounded-full text-xs text-${themeColor}-200 backdrop-blur-md`}>
                         <FileText size={12} />
                         <span className="max-w-[150px] truncate">{file.name}</span>
                         <button onClick={() => removeFile(i)} className="hover:text-white"><X size={12} /></button>
@@ -384,7 +374,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
 
         <div className="relative group max-w-4xl mx-auto">
             <div className={`absolute -inset-0.5 bg-gradient-to-r from-${themeColor}-600 to-blue-600 rounded-xl opacity-20 group-hover:opacity-40 transition duration-500 blur`}></div>
-            <div className="relative flex items-end gap-2 bg-[#0c0c0e] rounded-xl p-2 border border-white/10">
+            <div className="relative flex items-end gap-2 bg-[#0c0c0e] rounded-xl p-2 border border-white/10 shadow-2xl">
                 <input 
                     type="file" 
                     multiple 
@@ -407,7 +397,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
                   className="w-full bg-transparent text-gray-200 placeholder-gray-600 font-mono text-sm resize-none p-3 h-14 max-h-32 focus:outline-none scrollbar-hide"
                 />
                 <button
-                  onClick={() => handleSubmit()}
+                  onClick={handleSubmit}
                   disabled={(isLoading || (!input.trim() && files.length === 0))}
                   className={`p-3 mb-1 bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-${themeColor}-900/20`}
                 >
@@ -415,8 +405,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
                 </button>
             </div>
         </div>
-        <div className="mt-2 flex justify-between px-2 text-[10px] text-gray-700 font-mono uppercase tracking-widest max-w-4xl mx-auto">
-            <span>SILLOGIC v3.1 // INFINITE FLOW</span>
+        <div className="mt-3 flex justify-between px-2 text-[10px] text-gray-700 font-mono uppercase tracking-widest max-w-4xl mx-auto">
+            <span>SILLOGIC v3.1</span>
             <span>SECURE ENCRYPTED CONNECTION</span>
         </div>
       </div>

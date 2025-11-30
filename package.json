@@ -13,9 +13,7 @@
     "react-dom": "^19.2.0",
     "three": "0.160.0",
     "@google/genai": "latest",
-    "lucide-react": "0.300.0",
-    "reactflow": "11.10.1",
-    "dagre": "0.8.5"
+    "lucide-react": "0.300.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

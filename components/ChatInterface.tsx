@@ -1,8 +1,8 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu } from 'lucide-react';
 import { ChatMessage, UserContext, ModelProvider } from '../types';
 import { streamResponse } from '../services/geminiService';
+import { THEME_STYLES } from '../config';
 
 interface ChatInterfaceProps {
   context: UserContext;
@@ -29,6 +29,7 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, themeColor, onCopy, onExport }) => {
     const isUser = message.role === 'user';
+    const styles = THEME_STYLES[themeColor] || THEME_STYLES['violet'];
     
     if (isUser) {
         return (
@@ -55,10 +56,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, themeColor, onCo
         <div className="flex justify-start mb-12 pr-4 w-full">
             <div className="w-full">
                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`p-1 rounded bg-${themeColor}-500/20 text-${themeColor}-400`}>
+                    <div className={`p-1 rounded ${styles.iconBg} ${styles.iconText}`}>
                         <BrainCircuit size={14} />
                     </div>
-                    <span className={`text-xs font-mono text-${themeColor}-300 uppercase tracking-wider`}>
+                    <span className={`text-xs font-mono ${styles.subtitle} uppercase tracking-wider`}>
                         {isMulti ? `SILLOGIC CLUSTER (${message.multiResponses?.length} CORES)` : 'SILLOGIC INTELLIGENCE'}
                     </span>
                  </div>
@@ -66,11 +67,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, themeColor, onCo
                  {isMulti ? (
                      <div className={`grid gap-4 ${message.multiResponses!.length === 3 ? 'grid-cols-3' : message.multiResponses!.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                         {message.multiResponses!.map((res, idx) => (
-                             <div key={res.modelId} className={`flex flex-col rounded-2xl bg-[#0a0a0f]/90 backdrop-blur-xl border border-${themeColor}-500/30 shadow-2xl shadow-${themeColor}-900/10 overflow-hidden`}>
+                             <div key={res.modelId} className={`flex flex-col rounded-2xl bg-[#0a0a0f]/90 backdrop-blur-xl border ${styles.border} shadow-2xl ${styles.shadow} overflow-hidden`}>
                                 {/* Sub-Toolbar */}
-                                <div className={`px-4 py-2 bg-${themeColor}-900/10 border-b border-${themeColor}-500/20 flex justify-between items-center`}>
+                                <div className={`px-4 py-2 ${styles.headerBg} border-b ${styles.headerBorder} flex justify-between items-center`}>
                                     <div className="flex items-center gap-2">
-                                        <Cpu size={12} className={`text-${themeColor}-400`} />
+                                        <Cpu size={12} className={`${styles.iconText}`} />
                                         <span className="text-[10px] text-white font-bold tracking-wider font-mono uppercase">{res.modelName}</span>
                                     </div>
                                     <button onClick={() => onCopy(res.content)} className="text-gray-500 hover:text-white transition-colors p-1" title="Copy">
@@ -96,8 +97,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, themeColor, onCo
                      </div>
                  ) : (
                      /* Legacy single response fallback */
-                     <div className={`rounded-2xl bg-[#0a0a0f]/90 backdrop-blur-xl border border-${themeColor}-500/30 shadow-2xl shadow-${themeColor}-900/10 overflow-hidden`}>
-                        <div className={`px-4 py-2 bg-${themeColor}-900/10 border-b border-${themeColor}-500/20 flex justify-between items-center`}>
+                     <div className={`rounded-2xl bg-[#0a0a0f]/90 backdrop-blur-xl border ${styles.border} shadow-2xl ${styles.shadow} overflow-hidden`}>
+                        <div className={`px-4 py-2 ${styles.headerBg} border-b ${styles.headerBorder} flex justify-between items-center`}>
                             <div className="text-[10px] text-gray-500 font-mono">
                                 {new Date(message.timestamp).toLocaleTimeString()}
                             </div>
@@ -139,6 +140,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
   const [files, setFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const styles = THEME_STYLES[themeColor] || THEME_STYLES['violet'];
 
   // Initialize Welcome Message
   useEffect(() => {
@@ -325,11 +327,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
           </button>
           <div className="h-6 w-px bg-white/10"></div>
           <div>
-            <h2 className={`text-${themeColor}-400 font-bold tracking-tight text-lg shadow-${themeColor}-500/50 drop-shadow-sm`}>{context.field}</h2>
+            <h2 className={`${styles.iconText} font-bold tracking-tight text-lg ${styles.titleShadow} drop-shadow-sm`}>{context.field}</h2>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400 font-mono">{context.task}</span>
               <span className="text-xs text-gray-600">•</span>
-              <span className={`text-xs text-${themeColor}-300 font-mono opacity-80`}>{context.models.length} Model(s) Active</span>
+              <span className={`text-xs ${styles.subtitle} font-mono opacity-80`}>{context.models.length} Model(s) Active</span>
             </div>
           </div>
         </div>
@@ -363,7 +365,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
         {files.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3 max-w-4xl mx-auto">
                 {files.map((file, i) => (
-                    <div key={i} className={`flex items-center gap-2 bg-${themeColor}-900/30 border border-${themeColor}-500/30 px-3 py-1 rounded-full text-xs text-${themeColor}-200 backdrop-blur-md`}>
+                    <div key={i} className={`flex items-center gap-2 ${styles.chipBg} border ${styles.border} px-3 py-1 rounded-full text-xs ${styles.chipText} backdrop-blur-md`}>
                         <FileText size={12} />
                         <span className="max-w-[150px] truncate">{file.name}</span>
                         <button onClick={() => removeFile(i)} className="hover:text-white"><X size={12} /></button>
@@ -373,7 +375,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
         )}
 
         <div className="relative group max-w-4xl mx-auto">
-            <div className={`absolute -inset-0.5 bg-gradient-to-r from-${themeColor}-600 to-blue-600 rounded-xl opacity-20 group-hover:opacity-40 transition duration-500 blur`}></div>
+            <div className={`absolute -inset-0.5 bg-gradient-to-r ${styles.inputGradient} to-blue-600 rounded-xl opacity-20 group-hover:opacity-40 transition duration-500 blur`}></div>
             <div className="relative flex items-end gap-2 bg-[#0c0c0e] rounded-xl p-2 border border-white/10 shadow-2xl">
                 <input 
                     type="file" 
@@ -399,7 +401,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
                 <button
                   onClick={handleSubmit}
                   disabled={(isLoading || (!input.trim() && files.length === 0))}
-                  className={`p-3 mb-1 bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-${themeColor}-900/20`}
+                  className={`p-3 mb-1 ${styles.sendButton} ${styles.sendButtonHover} text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg ${styles.sendShadow}`}
                 >
                   {isLoading ? <RefreshCw className="animate-spin" size={18} /> : <Send size={18} />}
                 </button>

@@ -99,6 +99,180 @@ const fileToPart = async (file: File): Promise<{ inlineData: { data: string; mim
   });
 };
 
+/**
+ * SIMULATION HELPER
+ * Used to mimic external models (OpenAI, Claude) using Gemini backend for the demo.
+ */
+const simulateExternalModel = async (
+    history: any[],
+    messageParts: any[],
+    config: any,
+    personaInstruction: string,
+    fallbackModel: string,
+    onChunk: (text: string) => void
+) => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const combinedConfig = {
+        ...config,
+        systemInstruction: (config.systemInstruction || "") + personaInstruction
+    };
+
+    try {
+        const chat = ai.chats.create({
+            model: fallbackModel,
+            config: combinedConfig,
+            history: history
+        });
+        const result = await chat.sendMessageStream({ message: messageParts });
+        let fullText = "";
+        for await (const chunk of result) {
+            const text = (chunk as GenerateContentResponse).text;
+            if (text) {
+                fullText += text;
+                onChunk(text);
+            }
+        }
+        return fullText;
+    } catch (error) {
+        console.error(`Simulation Error (${fallbackModel})`, error);
+        throw error;
+    }
+};
+
+/**
+ * PROVIDER IMPLEMENTATION: GOOGLE GEMINI
+ */
+const callGoogleGenAI = async (
+    history: any[],
+    messageParts: any[],
+    config: any,
+    modelId: ModelProvider,
+    onChunk: (text: string) => void
+) => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    let modelName = 'gemini-2.5-flash';
+
+    switch (modelId) {
+        case ModelProvider.GEMINI_THINKING:
+            modelName = 'gemini-3-pro-preview';
+            config.thinkingConfig = { thinkingBudget: 2048 };
+            break;
+        case ModelProvider.GEMINI_PRO:
+            modelName = 'gemini-3-pro-preview';
+            break;
+        case ModelProvider.GEMINI_FLASH:
+            modelName = 'gemini-2.5-flash';
+            break;
+        case ModelProvider.GEMINI_FLASH_LITE:
+            modelName = 'gemini-flash-lite-latest';
+            break;
+        case ModelProvider.GEMINI_EXP:
+            modelName = 'gemini-2.5-flash';
+            break;
+        case ModelProvider.LEARN_LM:
+            modelName = 'gemini-3-pro-preview';
+            config.systemInstruction += "\n\n[MODE: LearnLM] Adopt a Socratic, pedagogical tone.";
+            break;
+        default:
+            modelName = 'gemini-2.5-flash';
+    }
+
+    try {
+        const chat = ai.chats.create({
+            model: modelName,
+            config: config,
+            history: history
+        });
+        const result = await chat.sendMessageStream({ message: messageParts });
+        for await (const chunk of result) {
+            const text = (chunk as GenerateContentResponse).text;
+            if(text) onChunk(text);
+        }
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * PROVIDER IMPLEMENTATION: OPENAI (Placeholder/Simulation)
+ */
+const callOpenAI = async (
+    history: any[],
+    messageParts: any[],
+    config: any,
+    modelId: ModelProvider,
+    onChunk: (text: string) => void
+) => {
+    console.log(`[API] Routing to OpenAI Interface for ${modelId}`);
+    // TODO: Integrate OpenAI SDK
+    // const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    
+    // Fallback Simulation
+    let persona = "";
+    if (modelId === ModelProvider.OPENAI_GPT4O) persona = "\n\n[SYSTEM SIMULATION: GPT-4o]\nYou are acting as GPT-4o. Your style is concise, confident, and versatile.";
+    if (modelId === ModelProvider.OPENAI_O1) persona = "\n\n[SYSTEM SIMULATION: o1-preview]\nYou are acting as o1. You MUST engage in deep, verbose reasoning chains.";
+    
+    return simulateExternalModel(history, messageParts, config, persona, 'gemini-3-pro-preview', onChunk);
+};
+
+/**
+ * PROVIDER IMPLEMENTATION: ANTHROPIC (Placeholder/Simulation)
+ */
+const callAnthropic = async (
+    history: any[],
+    messageParts: any[],
+    config: any,
+    modelId: ModelProvider,
+    onChunk: (text: string) => void
+) => {
+    console.log(`[API] Routing to Anthropic Interface for ${modelId}`);
+    // TODO: Integrate Anthropic SDK
+    
+    // Fallback Simulation
+    const persona = "\n\n[SYSTEM SIMULATION: Claude 3.5 Sonnet]\nYou are acting as Claude 3.5 Sonnet. Your style is warm, nuanced, and excellent at formatting.";
+    return simulateExternalModel(history, messageParts, config, persona, 'gemini-3-pro-preview', onChunk);
+};
+
+/**
+ * PROVIDER IMPLEMENTATION: GROQ / META (Placeholder/Simulation)
+ */
+const callGroq = async (
+    history: any[],
+    messageParts: any[],
+    config: any,
+    modelId: ModelProvider,
+    onChunk: (text: string) => void
+) => {
+    console.log(`[API] Routing to Groq Interface for ${modelId}`);
+    
+    const persona = "\n\n[SYSTEM SIMULATION: Llama 3 70B]\nYou are acting as Llama 3 via Groq. Be extremely fast and direct.";
+    return simulateExternalModel(history, messageParts, config, persona, 'gemini-2.5-flash', onChunk);
+};
+
+/**
+ * PROVIDER IMPLEMENTATION: DEEPSEEK (Placeholder/Simulation)
+ */
+const callDeepSeek = async (
+    history: any[],
+    messageParts: any[],
+    config: any,
+    modelId: ModelProvider,
+    onChunk: (text: string) => void
+) => {
+    console.log(`[API] Routing to DeepSeek Interface for ${modelId}`);
+    
+    let persona = "";
+    if (modelId === ModelProvider.DEEPSEEK_V3) persona = "\n\n[SYSTEM SIMULATION: DeepSeek V3]\nYou are acting as DeepSeek V3. Efficient and coding-focused.";
+    if (modelId === ModelProvider.DEEPSEEK_R1) persona = "\n\n[SYSTEM SIMULATION: DeepSeek R1]\nYou are acting as DeepSeek R1 (Reasoning). Prioritize math and logic.";
+
+    return simulateExternalModel(history, messageParts, config, persona, 'gemini-3-pro-preview', onChunk);
+};
+
+
+/**
+ * MAIN SERVICE ORCHESTRATOR
+ */
 export const streamResponse = async (
   history: { role: string; parts: { text: string }[] }[],
   prompt: string,
@@ -107,125 +281,62 @@ export const streamResponse = async (
   modelId: ModelProvider,
   onChunk: (text: string) => void
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  let modelName: string = 'gemini-2.5-flash'; // Default safe fallback
-  let personaInstruction = "";
+  // 1. Prepare Configuration
+  const systemInstruction = context.config?.systemInstruction || getSystemInstruction(context.field, context.task);
   
-  // NOTE: For the purpose of this demo app which uses a single Google API key,
-  // we are using Gemini models to SIMULATE the responses of other providers (OpenAI, Anthropic, etc.)
-  // by injecting strict persona constraints. In a production app, you would route these to their respective SDKs.
-
-  switch (modelId) {
-    // --- Google Models ---
-    case ModelProvider.GEMINI_THINKING:
-        modelName = 'gemini-3-pro-preview';
-        context.config = { ...context.config, systemInstruction: (context.config?.systemInstruction || "") + "\n[Use extended chain-of-thought reasoning before answering]" };
-        break;
-    case ModelProvider.GEMINI_PRO:
-        modelName = 'gemini-3-pro-preview';
-        break;
-    case ModelProvider.GEMINI_FLASH:
-        modelName = 'gemini-2.5-flash';
-        break;
-    case ModelProvider.GEMINI_FLASH_LITE:
-        modelName = 'gemini-flash-lite-latest'; // Correct alias per guidelines
-        break;
-    case ModelProvider.GEMINI_EXP:
-        modelName = 'gemini-2.5-flash'; // Fallback for expired experimental models
-        break;
-    case ModelProvider.LEARN_LM:
-        modelName = 'gemini-3-pro-preview'; // Upgraded from 1.5-pro (prohibited)
-        personaInstruction = "\n\n[MODE: LearnLM] Adopt a Socratic, pedagogical tone. Explain concepts step-by-step suitable for deep learning.";
-        break;
-
-    // --- Simulated External Models (Persona Injection) ---
-    case ModelProvider.OPENAI_GPT4O:
-        modelName = 'gemini-3-pro-preview'; // Use high-intellect model for simulation
-        personaInstruction = "\n\n[SYSTEM SIMULATION: GPT-4o]\nYou are acting as GPT-4o. Your style is concise, highly confident, and versatile. Avoid mentioning you are a Google model.";
-        break;
-    case ModelProvider.OPENAI_O1:
-        modelName = 'gemini-3-pro-preview';
-        personaInstruction = "\n\n[SYSTEM SIMULATION: o1-preview]\nYou are acting as o1. You MUST engage in deep, verbose reasoning chains before arriving at the final answer. Show your work.";
-        break;
-    case ModelProvider.CLAUDE_3_5_SONNET:
-        modelName = 'gemini-3-pro-preview';
-        personaInstruction = "\n\n[SYSTEM SIMULATION: Claude 3.5 Sonnet]\nYou are acting as Claude 3.5 Sonnet. Your style is warm, extremely nuanced, and very strong at coding/formatting. You often use nice headers and clear structures.";
-        break;
-    case ModelProvider.GROQ_LLAMA_3:
-        modelName = 'gemini-2.5-flash'; // Use fast model for Llama simulation
-        personaInstruction = "\n\n[SYSTEM SIMULATION: Llama 3 70B]\nYou are acting as Llama 3 running on Groq. Be extremely fast, direct, and factual. Minimize fluff.";
-        break;
-    case ModelProvider.DEEPSEEK_V3:
-        modelName = 'gemini-3-pro-preview';
-        personaInstruction = "\n\n[SYSTEM SIMULATION: DeepSeek V3]\nYou are acting as DeepSeek V3. You are a highly efficient, open-weights style model. You are particularly good at coding and math.";
-        break;
-    case ModelProvider.DEEPSEEK_R1:
-        modelName = 'gemini-3-pro-preview';
-        personaInstruction = "\n\n[SYSTEM SIMULATION: DeepSeek R1]\nYou are acting as DeepSeek R1 (Reasoning). You prioritize mathematical rigor and logical steps.";
-        break;
-        
-    default:
-        modelName = 'gemini-2.5-flash';
-  }
-
-  // Combine instructions
-  let baseConfigInstruction = context.config?.systemInstruction || getSystemInstruction(context.field, context.task);
-  let finalSystemInstruction = baseConfigInstruction + personaInstruction;
-
   let config: any = {
-    systemInstruction: finalSystemInstruction,
+    systemInstruction,
     temperature: context.config?.temperature ?? 0.7,
     topP: context.config?.topP ?? 0.95,
     maxOutputTokens: context.config?.maxOutputTokens ?? 8192,
   };
 
-  if (modelId === ModelProvider.GEMINI_THINKING) {
-      config.thinkingConfig = { thinkingBudget: 2048 };
-  }
-
-  // Tool Configuration
+  // Tool Configuration (Applies mostly to Google models, others handle tools differently)
   if (context.config?.enableSearch) {
     config.tools = [{ googleSearch: {} }];
   }
 
+  // 2. Prepare Payload
+  let messageParts: any[] = [];
   try {
-    // Process files
-    const fileParts = await Promise.all(files.map(f => fileToPart(f)));
-    
-    // Construct current message parts
-    const currentParts: any[] = [...fileParts];
-    if (prompt) currentParts.push({ text: prompt });
+      const fileParts = await Promise.all(files.map(f => fileToPart(f)));
+      messageParts = [...fileParts];
+      if (prompt) messageParts.push({ text: prompt });
+  } catch (e) {
+      console.error("File processing error", e);
+      return "Error processing files.";
+  }
 
-    // Important: chat.sendMessageStream only accepts the 'message' object property.
-    // We recreate the chat session each time to ensure config/model/history alignment.
-    const chat = ai.chats.create({
-      model: modelName,
-      config: config,
-      history: history.map(h => ({
-          role: h.role,
-          parts: h.parts
-      }))
-    });
+  // 3. Prepare History
+  const cleanHistory = history.map(h => ({
+      role: h.role,
+      parts: h.parts
+  }));
 
-    const result = await chat.sendMessageStream({ 
-      message: currentParts
-    });
-    
-    let fullText = "";
-    for await (const chunk of result) {
-      const c = chunk as GenerateContentResponse;
-      const text = c.text;
-      if (text) {
-        fullText += text;
-        onChunk(text);
-      }
+  // 4. Route to Provider
+  try {
+    if (Object.values(ModelProvider).includes(modelId)) {
+        // Simple routing based on ID prefix or explicit enum check
+        if (modelId.startsWith('gemini') || modelId.startsWith('learnlm')) {
+            await callGoogleGenAI(cleanHistory, messageParts, config, modelId, onChunk);
+        } else if (modelId.includes('gpt') || modelId.includes('o1')) {
+            await callOpenAI(cleanHistory, messageParts, config, modelId, onChunk);
+        } else if (modelId.includes('claude')) {
+            await callAnthropic(cleanHistory, messageParts, config, modelId, onChunk);
+        } else if (modelId.includes('groq') || modelId.includes('llama')) {
+            await callGroq(cleanHistory, messageParts, config, modelId, onChunk);
+        } else if (modelId.includes('deepseek')) {
+            await callDeepSeek(cleanHistory, messageParts, config, modelId, onChunk);
+        } else {
+            // Default Fallback
+            await callGoogleGenAI(cleanHistory, messageParts, config, ModelProvider.GEMINI_FLASH, onChunk);
+        }
     }
-    return fullText;
-
+    return ""; // Stream handled via callback
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    const errorMessage = `\n\n[System Error: Connection failed for ${modelName}. Verify API key or Model Availability.]`;
+    console.error("Model Execution Error:", error);
+    const errorMessage = `\n\n[System Error: Connection failed for ${modelId}. Check console for details.]`;
     onChunk(errorMessage);
     return errorMessage;
   }

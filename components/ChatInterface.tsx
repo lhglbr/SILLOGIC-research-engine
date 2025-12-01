@@ -1,7 +1,6 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame } from 'lucide-react';
+import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -215,6 +214,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
@@ -226,11 +227,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
   // Settings State
   const [agentConfig, setAgentConfig] = useState<AgentConfig>({
       enableSearch: false,
-      systemInstruction: getSystemInstruction(context.field!, context.task!)
+      systemInstruction: getSystemInstruction(context.field!, context.task!),
+      temperature: 0.7,
+      topP: 0.95
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Close model dropdown on click outside
   useEffect(() => {
@@ -264,6 +268,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
     scrollToBottom();
   }, [messages, isLoading]);
 
+  // Auto-resize input
+  useEffect(() => {
+    if (textareaRef.current) {
+        textareaRef.current.style.height = '56px'; // Reset to min height to allow shrinking
+        const scrollHeight = textareaRef.current.scrollHeight;
+        textareaRef.current.style.height = Math.min(scrollHeight, 200) + 'px'; // Cap at 200px
+    }
+  }, [input]);
+
   // File Handling
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -278,6 +291,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
           const recognition = new (window as any).webkitSpeechRecognition();
           recognition.continuous = false;
           recognition.interimResults = false;
+          
+          recognition.onstart = () => setIsListening(true);
+          recognition.onend = () => setIsListening(false);
+          
           recognition.onresult = (event: any) => {
               const text = event.results[0][0].transcript;
               setInput(prev => prev + (prev ? ' ' : '') + text);
@@ -291,9 +308,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
   // Text to Speech
   const speakText = (text: string) => {
       window.speechSynthesis.cancel();
+      if (isSpeaking) {
+          setIsSpeaking(false);
+          return;
+      }
+      
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.1;
-      utterance.pitch = 0.9;
+      utterance.pitch = 1.0;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      
+      // Clean up markdown syntax for speech
+      const cleanText = text.replace(/[*#`_]/g, '');
+      utterance.text = cleanText;
+      
       window.speechSynthesis.speak(utterance);
   };
 
@@ -477,38 +506,82 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
       <div className={`fixed inset-y-0 right-0 w-80 bg-[#0c0c0e] border-l border-white/10 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${showSettings ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="p-6 h-full flex flex-col overflow-y-auto">
               <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-white font-bold tracking-wider flex items-center gap-2"><Bot size={18}/> AGENT SETTINGS</h3>
+                  <h3 className="text-white font-bold tracking-wider flex items-center gap-2"><Bot size={18}/> AGENT CONFIG</h3>
                   <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-white"><X size={20}/></button>
               </div>
               
               {/* Plugins */}
               <div className="mb-8">
-                  <h4 className="text-xs text-gray-500 font-bold uppercase mb-4 tracking-widest">Plugins</h4>
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+                  <h4 className="text-xs text-gray-500 font-bold uppercase mb-4 tracking-widest flex items-center gap-2"><Globe size={12}/> Plugins</h4>
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition-colors">
                       <div className="flex items-center gap-3">
-                          <Globe size={18} className="text-blue-400"/>
-                          <span className="text-sm text-gray-300">Google Search</span>
+                          <div className={`p-1.5 rounded bg-blue-500/20 text-blue-400`}>
+                            <Globe size={16} />
+                          </div>
+                          <div>
+                            <span className="text-sm text-gray-300 block font-medium">Google Search</span>
+                            <span className="text-[10px] text-gray-500 block">Real-time web grounding</span>
+                          </div>
                       </div>
                       <button 
                         onClick={() => setAgentConfig(prev => ({ ...prev, enableSearch: !prev.enableSearch }))}
                         className={`w-10 h-5 rounded-full relative transition-colors ${agentConfig.enableSearch ? `bg-${themeColor}-600` : 'bg-gray-700'}`}
                       >
-                          <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${agentConfig.enableSearch ? 'translate-x-5' : ''}`}></div>
+                          <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${agentConfig.enableSearch ? 'translate-x-5' : ''}`}></div>
                       </button>
+                  </div>
+              </div>
+
+              {/* Generation Parameters (Lobe Style) */}
+              <div className="mb-8">
+                  <h4 className="text-xs text-gray-500 font-bold uppercase mb-4 tracking-widest flex items-center gap-2"><Sliders size={12}/> Parameters</h4>
+                  
+                  {/* Temperature */}
+                  <div className="mb-4">
+                      <div className="flex justify-between text-xs text-gray-400 mb-2">
+                          <span>Temperature</span>
+                          <span>{agentConfig.temperature}</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" max="1" step="0.1"
+                        value={agentConfig.temperature}
+                        onChange={(e) => setAgentConfig(prev => ({...prev, temperature: parseFloat(e.target.value)}))}
+                        className={`w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-${themeColor}-500`}
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                          <span>Precise</span>
+                          <span>Creative</span>
+                      </div>
+                  </div>
+
+                  {/* Top P */}
+                  <div className="mb-4">
+                      <div className="flex justify-between text-xs text-gray-400 mb-2">
+                          <span>Top P</span>
+                          <span>{agentConfig.topP}</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" max="1" step="0.05"
+                        value={agentConfig.topP}
+                        onChange={(e) => setAgentConfig(prev => ({...prev, topP: parseFloat(e.target.value)}))}
+                        className={`w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-${themeColor}-500`}
+                      />
                   </div>
               </div>
 
               {/* System Prompt */}
               <div className="flex-1 flex flex-col min-h-0">
-                  <h4 className="text-xs text-gray-500 font-bold uppercase mb-4 tracking-widest">System Instruction</h4>
+                  <h4 className="text-xs text-gray-500 font-bold uppercase mb-4 tracking-widest flex items-center gap-2"><FileText size={12}/> System Instruction</h4>
                   <textarea 
                     value={agentConfig.systemInstruction}
                     onChange={(e) => setAgentConfig(prev => ({ ...prev, systemInstruction: e.target.value }))}
-                    className="flex-1 bg-black/40 border border-white/10 rounded-lg p-3 text-xs font-mono text-gray-400 resize-none focus:outline-none focus:border-white/30"
+                    className="flex-1 bg-black/40 border border-white/10 rounded-lg p-3 text-xs font-mono text-gray-400 resize-none focus:outline-none focus:border-white/30 transition-colors"
                     placeholder="Override system prompt..."
                   />
                   <div className="mt-2 text-[10px] text-gray-600">
-                      Changes apply to the next message.
+                      Modifies the AI persona for the next message.
                   </div>
               </div>
           </div>
@@ -623,6 +696,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
                     </div>
                 )}
             </div>
+            
+            {/* Visual Plugin Indicators */}
+            {agentConfig.enableSearch && (
+                 <div className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded bg-blue-900/30 border border-blue-500/30 text-[10px] text-blue-300">
+                     <Globe size={10} /> WEB CONNECTED
+                 </div>
+            )}
         </div>
 
         {/* File Chips */}
@@ -659,19 +739,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
                     </button>
                     <button 
                         onClick={startListening}
-                        className="p-3 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                        className={`p-3 rounded-lg transition-colors ${isListening ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
                         title="Voice Input"
                     >
                         <Mic size={18} />
                     </button>
+                    {isSpeaking && (
+                         <button 
+                            onClick={() => window.speechSynthesis.cancel()}
+                            className="p-3 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10 rounded-lg transition-colors"
+                            title="Stop Speaking"
+                        >
+                            <VolumeX size={18} />
+                        </button>
+                    )}
                 </div>
 
                 <textarea
+                  ref={textareaRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Ask a research question... (Ctrl + Enter to send)"
-                  className="w-full bg-transparent text-gray-200 placeholder-gray-600 font-mono text-sm resize-none p-3 h-14 max-h-32 focus:outline-none scrollbar-hide"
+                  className="w-full bg-transparent text-gray-200 placeholder-gray-600 font-mono text-sm resize-none py-4 px-3 focus:outline-none scrollbar-hide overflow-y-auto"
+                  style={{ height: '56px' }}
                 />
                 <button
                   onClick={handleSubmit}

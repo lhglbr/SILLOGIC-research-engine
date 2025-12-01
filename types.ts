@@ -1,5 +1,4 @@
 
-
 export enum AppView {
   LANDING = 'LANDING',
   FIELD_SELECT = 'FIELD_SELECT',
@@ -62,6 +61,9 @@ export interface ChatMessage {
 export interface AgentConfig {
   systemInstruction?: string;
   enableSearch?: boolean;
+  temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
 }
 
 export interface UserContext {

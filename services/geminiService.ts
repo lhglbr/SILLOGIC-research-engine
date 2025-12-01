@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ResearchField, ResearchTask, ModelProvider, AgentConfig } from "../types";
 
@@ -177,6 +176,9 @@ export const streamResponse = async (
 
   let config: any = {
     systemInstruction: finalSystemInstruction,
+    temperature: context.config?.temperature ?? 0.7,
+    topP: context.config?.topP ?? 0.95,
+    maxOutputTokens: context.config?.maxOutputTokens ?? 8192,
   };
 
   if (modelId === ModelProvider.GEMINI_THINKING) {

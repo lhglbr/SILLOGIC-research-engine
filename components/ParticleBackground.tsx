@@ -73,7 +73,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
     
     // Store different shapes
     const shapes: Float32Array[] = [];
-    const SHAPE_COUNT = 6;
+    const SHAPE_COUNT = 8;
     
     // 1. Random Sphere (Initial)
     const shape0 = new Float32Array(particleCount * 3);
@@ -116,7 +116,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
     }
     shapes.push(shape1);
 
-    // 3. Archimedean Spiral / Helix
+    // 3. Helix / Spring
     const shape2 = new Float32Array(particleCount * 3);
     for(let i=0; i<particleCount; i++){
         const t = (i / particleCount) * 50 * Math.PI;
@@ -176,6 +176,54 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
         shape5[i*3+2] = z;
     }
     shapes.push(shape5);
+
+    // 7. Maxwell EM Wave
+    const shape6 = new Float32Array(particleCount * 3);
+    for(let i=0; i<particleCount; i++){
+        const x = (i / particleCount) * 140 - 70; // Long propagation axis
+        const freq = 0.12;
+        const amp = 15;
+        
+        // Split particles: half for E-field (Vertical), half for B-Field (Horizontal)
+        if (i % 2 === 0) {
+            // E-Field: Sinusoidal in Y, 0 in Z
+            const y = amp * Math.sin(x * freq);
+            const z = (Math.random() - 0.5) * 2; // Slight jitter/thickness
+            shape6[i*3] = x;
+            shape6[i*3+1] = y;
+            shape6[i*3+2] = z;
+        } else {
+            // B-Field: Sinusoidal in Z, 0 in Y
+            const z = amp * Math.sin(x * freq);
+            const y = (Math.random() - 0.5) * 2; // Slight jitter/thickness
+            shape6[i*3] = x;
+            shape6[i*3+1] = y;
+            shape6[i*3+2] = z;
+        }
+    }
+    shapes.push(shape6);
+
+    // 8. Archimedean Spiral (Planar Galaxy)
+    const shape7 = new Float32Array(particleCount * 3);
+    for(let i=0; i<particleCount; i++){
+        // Multiple arms for visual density (3 arms)
+        const arm = i % 3;
+        const pointsPerArm = particleCount / 3;
+        const t = (Math.floor(i/3) / pointsPerArm) * 12 * Math.PI; // Theta max
+        
+        // r = a + b * theta
+        const r = 2 + 0.8 * t;
+        const angle = t + (arm * (2 * Math.PI / 3)); // Offset arms by 120 degrees
+        
+        const x = r * Math.cos(angle);
+        const z = r * Math.sin(angle);
+        const y = (Math.random() - 0.5) * (r * 0.2); // Increase thickness at edges
+        
+        shape7[i*3] = x;
+        shape7[i*3+1] = y;
+        shape7[i*3+2] = z;
+    }
+    shapes.push(shape7);
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));

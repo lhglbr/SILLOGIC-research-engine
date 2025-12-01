@@ -129,14 +129,13 @@ export const streamResponse = async (
         modelName = 'gemini-2.5-flash';
         break;
     case ModelProvider.GEMINI_FLASH_LITE:
-        modelName = 'gemini-2.5-flash-lite-preview-02-05';
-        if (modelName === 'gemini-2.5-flash-lite-preview-02-05') modelName = 'gemini-2.5-flash'; 
+        modelName = 'gemini-flash-lite-latest'; // Correct alias per guidelines
         break;
     case ModelProvider.GEMINI_EXP:
-        modelName = 'gemini-exp-1206';
+        modelName = 'gemini-2.5-flash'; // Fallback for expired experimental models
         break;
     case ModelProvider.LEARN_LM:
-        modelName = 'gemini-1.5-pro';
+        modelName = 'gemini-3-pro-preview'; // Upgraded from 1.5-pro (prohibited)
         personaInstruction = "\n\n[MODE: LearnLM] Adopt a Socratic, pedagogical tone. Explain concepts step-by-step suitable for deep learning.";
         break;
 
@@ -198,6 +197,8 @@ export const streamResponse = async (
     const currentParts: any[] = [...fileParts];
     if (prompt) currentParts.push({ text: prompt });
 
+    // Important: chat.sendMessageStream only accepts the 'message' object property.
+    // We recreate the chat session each time to ensure config/model/history alignment.
     const chat = ai.chats.create({
       model: modelName,
       config: config,
@@ -224,7 +225,7 @@ export const streamResponse = async (
 
   } catch (error) {
     console.error("Gemini API Error:", error);
-    const errorMessage = `\n\n[System Error: ${modelId} connection failed. Verify API key or Model Availability.]`;
+    const errorMessage = `\n\n[System Error: Connection failed for ${modelName}. Verify API key or Model Availability.]`;
     onChunk(errorMessage);
     return errorMessage;
   }

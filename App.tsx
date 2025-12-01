@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
 import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon } from 'lucide-react';
 
 // --- Configuration per Field ---
 const FIELD_CONFIG = {
@@ -91,12 +91,24 @@ const FIELD_CONFIG = {
 };
 
 const MODELS_LIST = [
-  { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Fastest • Multimodal", icon: Zap },
-  { id: ModelProvider.GEMINI_FLASH_LITE, name: "Gemini 2.5 Flash-Lite", desc: "Ultra-Fast • Low Latency", icon: Zap },
-  { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Complex Reasoning • SOTA", icon: Cpu },
-  { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Deep Logic • Chain of Thought", icon: BrainCircuit },
-  { id: ModelProvider.GEMINI_EXP, name: "Gemini Experimental", desc: "Latest Research Checkpoint", icon: TestTube },
-  { id: ModelProvider.LEARN_LM, name: "LearnLM 1.5 Pro", desc: "Pedagogical • Tutor Mode", icon: Users },
+  // Google
+  { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Google • Fast & Multimodal", icon: Zap },
+  { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Google • Complex Reasoning", icon: Cpu },
+  { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Google • Deep Logic", icon: BrainCircuit },
+  
+  // OpenAI
+  { id: ModelProvider.OPENAI_GPT4O, name: "GPT-4o", desc: "OpenAI • Omni Model", icon: MessageSquare },
+  { id: ModelProvider.OPENAI_O1, name: "o1-preview", desc: "OpenAI • Reasoning Chain", icon: Sparkles },
+
+  // Anthropic
+  { id: ModelProvider.CLAUDE_3_5_SONNET, name: "Claude 3.5 Sonnet", desc: "Anthropic • Coding & Nuance", icon: Hexagon },
+
+  // DeepSeek
+  { id: ModelProvider.DEEPSEEK_V3, name: "DeepSeek V3", desc: "DeepSeek • Efficient SOTA", icon: Flame },
+  { id: ModelProvider.DEEPSEEK_R1, name: "DeepSeek R1", desc: "DeepSeek • Math Specialist", icon: Binary },
+
+  // Groq / Meta
+  { id: ModelProvider.GROQ_LLAMA_3, name: "Llama 3 70B", desc: "Meta/Groq • Ultra Low Latency", icon: Zap },
 ];
 
 const ModelDropdown: React.FC<{ 

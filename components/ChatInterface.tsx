@@ -1,6 +1,7 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus } from 'lucide-react';
+import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -16,23 +17,39 @@ interface ChatInterfaceProps {
 // Helper to get friendly name
 const getModelDisplayName = (id: ModelProvider) => {
     switch(id) {
+        // Google
         case ModelProvider.GEMINI_FLASH: return "Gemini 2.5 Flash";
         case ModelProvider.GEMINI_FLASH_LITE: return "Gemini 2.5 Flash-Lite";
         case ModelProvider.GEMINI_PRO: return "Gemini 3.0 Pro";
         case ModelProvider.GEMINI_THINKING: return "Gemini 3.0 Thinking";
         case ModelProvider.GEMINI_EXP: return "Gemini Experimental";
         case ModelProvider.LEARN_LM: return "LearnLM 1.5 Pro";
+        
+        // External
+        case ModelProvider.OPENAI_GPT4O: return "GPT-4o";
+        case ModelProvider.OPENAI_O1: return "o1-preview";
+        case ModelProvider.CLAUDE_3_5_SONNET: return "Claude 3.5 Sonnet";
+        case ModelProvider.GROQ_LLAMA_3: return "Llama 3 70B";
+        case ModelProvider.DEEPSEEK_V3: return "DeepSeek V3";
+        case ModelProvider.DEEPSEEK_R1: return "DeepSeek R1";
+        
         default: return id;
     }
 }
 
 const AVAILABLE_MODELS = [
-  { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Fast, Efficient" },
-  { id: ModelProvider.GEMINI_FLASH_LITE, name: "Gemini 2.5 Flash-Lite", desc: "Ultra-Fast" },
-  { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Reasoning" },
-  { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Deep Logic" },
-  { id: ModelProvider.GEMINI_EXP, name: "Gemini Exp", desc: "Latest Research" },
-  { id: ModelProvider.LEARN_LM, name: "LearnLM Pro", desc: "Tutor" },
+  // Google
+  { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Google • Fast" },
+  { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Google • Reasoning" },
+  { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Google • Logic" },
+  
+  // Others
+  { id: ModelProvider.OPENAI_GPT4O, name: "GPT-4o", desc: "OpenAI • Omni" },
+  { id: ModelProvider.CLAUDE_3_5_SONNET, name: "Claude 3.5 Sonnet", desc: "Anthropic" },
+  { id: ModelProvider.DEEPSEEK_V3, name: "DeepSeek V3", desc: "DeepSeek" },
+  { id: ModelProvider.GROQ_LLAMA_3, name: "Llama 3 70B", desc: "Groq" },
+  { id: ModelProvider.OPENAI_O1, name: "o1-preview", desc: "OpenAI • Chain" },
+  { id: ModelProvider.DEEPSEEK_R1, name: "DeepSeek R1", desc: "DeepSeek • Math" },
 ];
 
 interface MessageBubbleProps {

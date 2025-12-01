@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ResearchField, ResearchTask, ModelProvider, AgentConfig } from "../types";
 
@@ -110,21 +111,17 @@ export const streamResponse = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   let modelName: string = 'gemini-2.5-flash'; // Default safe fallback
-  let config: any = {
-    systemInstruction: context.config?.systemInstruction || getSystemInstruction(context.field, context.task),
-  };
+  let personaInstruction = "";
+  
+  // NOTE: For the purpose of this demo app which uses a single Google API key,
+  // we are using Gemini models to SIMULATE the responses of other providers (OpenAI, Anthropic, etc.)
+  // by injecting strict persona constraints. In a production app, you would route these to their respective SDKs.
 
-  // Tool Configuration
-  if (context.config?.enableSearch) {
-    // Note: Tools support depends on specific model capabilities
-    config.tools = [{ googleSearch: {} }];
-  }
-
-  // Model Selection Logic
   switch (modelId) {
+    // --- Google Models ---
     case ModelProvider.GEMINI_THINKING:
         modelName = 'gemini-3-pro-preview';
-        config.thinkingConfig = { thinkingBudget: 2048 };
+        context.config = { ...context.config, systemInstruction: (context.config?.systemInstruction || "") + "\n[Use extended chain-of-thought reasoning before answering]" };
         break;
     case ModelProvider.GEMINI_PRO:
         modelName = 'gemini-3-pro-preview';
@@ -133,19 +130,62 @@ export const streamResponse = async (
         modelName = 'gemini-2.5-flash';
         break;
     case ModelProvider.GEMINI_FLASH_LITE:
-        modelName = 'gemini-2.5-flash-lite-preview-02-05'; // Explicit literal if available or fallback
-        // Fallback for demo purposes if specific lite model isn't in SDK enum yet
+        modelName = 'gemini-2.5-flash-lite-preview-02-05';
         if (modelName === 'gemini-2.5-flash-lite-preview-02-05') modelName = 'gemini-2.5-flash'; 
         break;
     case ModelProvider.GEMINI_EXP:
         modelName = 'gemini-exp-1206';
         break;
     case ModelProvider.LEARN_LM:
-        modelName = 'gemini-1.5-pro'; // Fallback base
-        config.systemInstruction += "\n\n[Pedagogical Mode: Explain concepts step-by-step, suitable for teaching and deep learning.]";
+        modelName = 'gemini-1.5-pro';
+        personaInstruction = "\n\n[MODE: LearnLM] Adopt a Socratic, pedagogical tone. Explain concepts step-by-step suitable for deep learning.";
         break;
+
+    // --- Simulated External Models (Persona Injection) ---
+    case ModelProvider.OPENAI_GPT4O:
+        modelName = 'gemini-3-pro-preview'; // Use high-intellect model for simulation
+        personaInstruction = "\n\n[SYSTEM SIMULATION: GPT-4o]\nYou are acting as GPT-4o. Your style is concise, highly confident, and versatile. Avoid mentioning you are a Google model.";
+        break;
+    case ModelProvider.OPENAI_O1:
+        modelName = 'gemini-3-pro-preview';
+        personaInstruction = "\n\n[SYSTEM SIMULATION: o1-preview]\nYou are acting as o1. You MUST engage in deep, verbose reasoning chains before arriving at the final answer. Show your work.";
+        break;
+    case ModelProvider.CLAUDE_3_5_SONNET:
+        modelName = 'gemini-3-pro-preview';
+        personaInstruction = "\n\n[SYSTEM SIMULATION: Claude 3.5 Sonnet]\nYou are acting as Claude 3.5 Sonnet. Your style is warm, extremely nuanced, and very strong at coding/formatting. You often use nice headers and clear structures.";
+        break;
+    case ModelProvider.GROQ_LLAMA_3:
+        modelName = 'gemini-2.5-flash'; // Use fast model for Llama simulation
+        personaInstruction = "\n\n[SYSTEM SIMULATION: Llama 3 70B]\nYou are acting as Llama 3 running on Groq. Be extremely fast, direct, and factual. Minimize fluff.";
+        break;
+    case ModelProvider.DEEPSEEK_V3:
+        modelName = 'gemini-3-pro-preview';
+        personaInstruction = "\n\n[SYSTEM SIMULATION: DeepSeek V3]\nYou are acting as DeepSeek V3. You are a highly efficient, open-weights style model. You are particularly good at coding and math.";
+        break;
+    case ModelProvider.DEEPSEEK_R1:
+        modelName = 'gemini-3-pro-preview';
+        personaInstruction = "\n\n[SYSTEM SIMULATION: DeepSeek R1]\nYou are acting as DeepSeek R1 (Reasoning). You prioritize mathematical rigor and logical steps.";
+        break;
+        
     default:
         modelName = 'gemini-2.5-flash';
+  }
+
+  // Combine instructions
+  let baseConfigInstruction = context.config?.systemInstruction || getSystemInstruction(context.field, context.task);
+  let finalSystemInstruction = baseConfigInstruction + personaInstruction;
+
+  let config: any = {
+    systemInstruction: finalSystemInstruction,
+  };
+
+  if (modelId === ModelProvider.GEMINI_THINKING) {
+      config.thinkingConfig = { thinkingBudget: 2048 };
+  }
+
+  // Tool Configuration
+  if (context.config?.enableSearch) {
+    config.tools = [{ googleSearch: {} }];
   }
 
   try {

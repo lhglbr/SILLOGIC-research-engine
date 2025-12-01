@@ -25,8 +25,11 @@ export enum ResearchTask {
 
 export enum ModelProvider {
   GEMINI_FLASH = 'gemini-2.5-flash',
+  GEMINI_FLASH_LITE = 'gemini-2.5-flash-lite', // Added
   GEMINI_PRO = 'gemini-3-pro-preview',
-  GEMINI_THINKING = 'gemini-3-pro-preview-thinking', // Internal flag for thinking config
+  GEMINI_THINKING = 'gemini-3-pro-preview-thinking',
+  GEMINI_EXP = 'gemini-exp-1206', // Added
+  LEARN_LM = 'learnlm-1.5-pro-experimental', // Added (Simulated via System Prompt)
 }
 
 export interface MultiModelResponse {
@@ -46,8 +49,14 @@ export interface ChatMessage {
   multiResponses?: MultiModelResponse[]; // Array for parallel responses
 }
 
+export interface AgentConfig {
+  systemInstruction?: string;
+  enableSearch?: boolean;
+}
+
 export interface UserContext {
   field?: ResearchField;
   task?: ResearchTask;
   models: ModelProvider[]; // Changed to array for multi-select
+  config?: AgentConfig;
 }

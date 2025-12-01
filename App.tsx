@@ -1,9 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
 import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box } from 'lucide-react';
 
 // --- Configuration per Field ---
 const FIELD_CONFIG = {
@@ -89,6 +89,87 @@ const FIELD_CONFIG = {
   },
 };
 
+const MODELS_LIST = [
+  { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Fastest • Multimodal", icon: Zap },
+  { id: ModelProvider.GEMINI_FLASH_LITE, name: "Gemini 2.5 Flash-Lite", desc: "Ultra-Fast • Low Latency", icon: Zap },
+  { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Complex Reasoning • SOTA", icon: Cpu },
+  { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Deep Logic • Chain of Thought", icon: BrainCircuit },
+  { id: ModelProvider.GEMINI_EXP, name: "Gemini Experimental", desc: "Latest Research Checkpoint", icon: TestTube },
+  { id: ModelProvider.LEARN_LM, name: "LearnLM 1.5 Pro", desc: "Pedagogical • Tutor Mode", icon: Users },
+];
+
+const ModelDropdown: React.FC<{ 
+  selectedModels: ModelProvider[], 
+  onToggle: (id: ModelProvider) => void,
+  themeColor: string
+}> = ({ selectedModels, onToggle, themeColor }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex justify-between items-center glass-panel p-4 rounded-xl border transition-all ${isOpen ? `border-${themeColor}-500 bg-white/5` : 'border-white/10 hover:border-white/30'}`}
+      >
+        <div className="flex items-center gap-3">
+          <Box size={20} className={`text-${themeColor}-400`} />
+          <div className="text-left">
+            <div className="text-sm font-bold text-gray-200">Selected Engines</div>
+            <div className={`text-xs text-${themeColor}-400`}>
+              {selectedModels.length > 0 
+                ? `${selectedModels.length} Model${selectedModels.length > 1 ? 's' : ''} Selected` 
+                : 'Select Models'}
+            </div>
+          </div>
+        </div>
+        <ChevronDown size={18} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-[#0c0c0e] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
+          {MODELS_LIST.map((model) => {
+            const isSelected = selectedModels.includes(model.id);
+            return (
+              <button
+                key={model.id}
+                onClick={() => onToggle(model.id)}
+                className={`w-full flex items-center justify-between p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors ${isSelected ? `bg-${themeColor}-900/10` : ''}`}
+              >
+                 <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${isSelected ? `bg-${themeColor}-500/20 text-${themeColor}-400` : 'bg-white/5 text-gray-400'}`}>
+                        <model.icon size={18} />
+                    </div>
+                    <div className="text-left">
+                        <div className={`text-sm font-semibold ${isSelected ? 'text-white' : 'text-gray-400'}`}>{model.name}</div>
+                        <div className="text-[10px] text-gray-600 uppercase tracking-wider">{model.desc}</div>
+                    </div>
+                 </div>
+                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${isSelected ? `bg-${themeColor}-500 border-${themeColor}-500` : 'border-gray-700'}`}>
+                    {isSelected && <Check size={14} className="text-black" strokeWidth={3} />}
+                 </div>
+              </button>
+            );
+          })}
+          <div className="p-2 bg-black/40 text-[10px] text-gray-500 text-center border-t border-white/5">
+             MAXIMUM 3 MODELS SIMULTANEOUSLY
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.LANDING);
   const [context, setContext] = useState<UserContext>({
@@ -96,12 +177,6 @@ const App: React.FC = () => {
   });
 
   const activeTheme = context.field ? FIELD_CONFIG[context.field] : FIELD_CONFIG[ResearchField.GENERAL];
-
-  const models = [
-    { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Fast, Efficient" },
-    { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Complex Reasoning" },
-    { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Deep Logic & Proof" },
-  ];
 
   const toggleModel = (modelId: ModelProvider) => {
     setContext(prev => {
@@ -213,28 +288,24 @@ const App: React.FC = () => {
                <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold">Engine Cluster</h3>
                <span className="text-xs text-gray-500">Select up to 3 for comparison</span>
             </div>
-            <div className="space-y-3">
-              {models.map((model) => {
-                const isSelected = context.models.includes(model.id);
+            
+            {/* Model Dropdown Implementation */}
+            <ModelDropdown 
+              selectedModels={context.models} 
+              onToggle={toggleModel} 
+              themeColor={activeTheme.color} 
+            />
+
+            {/* Selected Chips Preview */}
+            <div className="mt-4 flex flex-col gap-2">
+              {context.models.map(mId => {
+                const model = MODELS_LIST.find(m => m.id === mId);
                 return (
-                  <button
-                    key={model.id}
-                    onClick={() => toggleModel(model.id)}
-                    className={`w-full glass-panel p-4 rounded-xl text-left transition-all border flex justify-between items-center ${isSelected ? 'bg-white/10 border-white/50' : 'border-white/5 hover:bg-white/5'}`}
-                  >
-                    <div>
-                      <div className="text-sm font-semibold text-white">{model.name}</div>
-                      <div className="text-xs text-gray-500">{model.desc}</div>
-                    </div>
-                    {isSelected ? (
-                       <div className={`w-5 h-5 rounded flex items-center justify-center bg-${activeTheme.color}-500 text-black`}>
-                         <Check size={14} strokeWidth={3} />
-                       </div>
-                    ) : (
-                       <div className="w-5 h-5 rounded border border-gray-600"></div>
-                    )}
-                  </button>
-                );
+                  <div key={mId} className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/5">
+                    <div className={`w-2 h-2 rounded-full bg-${activeTheme.color}-500 shadow shadow-${activeTheme.color}-500/50`}></div>
+                    <span className="text-xs text-gray-300 font-mono">{model?.name}</span>
+                  </div>
+                )
               })}
             </div>
           </div>

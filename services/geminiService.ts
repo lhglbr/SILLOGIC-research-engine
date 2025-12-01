@@ -1,9 +1,9 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { ResearchField, ResearchTask, ModelProvider } from "../types";
+import { ResearchField, ResearchTask, ModelProvider, AgentConfig } from "../types";
 
 // Helper to get detailed system instructions
-const getSystemInstruction = (field: ResearchField, task: ResearchTask): string => {
+export const getSystemInstruction = (field: ResearchField, task: ResearchTask): string => {
   const baseIdentity = `You are SILLOGIC, a world-class research assistant specialized in **${field}**. 
   Your demeanor is professional, academic, and rigorous. 
   You prioritize accuracy, citation of standard theories, and logical consistency.`;
@@ -103,24 +103,49 @@ export const streamResponse = async (
   history: { role: string; parts: { text: string }[] }[],
   prompt: string,
   files: File[],
-  context: { field: ResearchField; task: ResearchTask },
+  context: { field: ResearchField; task: ResearchTask; config?: AgentConfig },
   modelId: ModelProvider,
   onChunk: (text: string) => void
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  let modelName: string = modelId;
+  let modelName: string = 'gemini-2.5-flash'; // Default safe fallback
   let config: any = {
-    systemInstruction: getSystemInstruction(context.field, context.task),
+    systemInstruction: context.config?.systemInstruction || getSystemInstruction(context.field, context.task),
   };
 
-  if (modelId === ModelProvider.GEMINI_THINKING) {
-    modelName = 'gemini-3-pro-preview';
-    config.thinkingConfig = { thinkingBudget: 1024 };
-  } else if (modelId === ModelProvider.GEMINI_PRO) {
-      modelName = 'gemini-3-pro-preview';
-  } else {
-      modelName = 'gemini-2.5-flash';
+  // Tool Configuration
+  if (context.config?.enableSearch) {
+    // Note: Tools support depends on specific model capabilities
+    config.tools = [{ googleSearch: {} }];
+  }
+
+  // Model Selection Logic
+  switch (modelId) {
+    case ModelProvider.GEMINI_THINKING:
+        modelName = 'gemini-3-pro-preview';
+        config.thinkingConfig = { thinkingBudget: 2048 };
+        break;
+    case ModelProvider.GEMINI_PRO:
+        modelName = 'gemini-3-pro-preview';
+        break;
+    case ModelProvider.GEMINI_FLASH:
+        modelName = 'gemini-2.5-flash';
+        break;
+    case ModelProvider.GEMINI_FLASH_LITE:
+        modelName = 'gemini-2.5-flash-lite-preview-02-05'; // Explicit literal if available or fallback
+        // Fallback for demo purposes if specific lite model isn't in SDK enum yet
+        if (modelName === 'gemini-2.5-flash-lite-preview-02-05') modelName = 'gemini-2.5-flash'; 
+        break;
+    case ModelProvider.GEMINI_EXP:
+        modelName = 'gemini-exp-1206';
+        break;
+    case ModelProvider.LEARN_LM:
+        modelName = 'gemini-1.5-pro'; // Fallback base
+        config.systemInstruction += "\n\n[Pedagogical Mode: Explain concepts step-by-step, suitable for teaching and deep learning.]";
+        break;
+    default:
+        modelName = 'gemini-2.5-flash';
   }
 
   try {
@@ -157,7 +182,7 @@ export const streamResponse = async (
 
   } catch (error) {
     console.error("Gemini API Error:", error);
-    const errorMessage = "\n\n[System Error: Unable to connect to the research engine. Please verify your API key, network connection, or file compatibility.]";
+    const errorMessage = `\n\n[System Error: ${modelId} connection failed. Verify API key or Model Availability.]`;
     onChunk(errorMessage);
     return errorMessage;
   }

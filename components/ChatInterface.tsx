@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -129,7 +128,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, themeColor, onCo
                         <BrainCircuit size={14} />
                     </div>
                     <span className={`text-xs font-mono text-${themeColor}-300 uppercase tracking-wider`}>
-                        {isMulti ? `SILLOGIC CLUSTER (${message.multiResponses?.length} CORES)` : 'SILLOGIC INTELLIGENCE'}
+                        {isMulti ? `PROTOCHAT CLUSTER (${message.multiResponses?.length} CORES)` : 'PROTOCHAT INTELLIGENCE'}
                     </span>
                  </div>
                  
@@ -352,7 +351,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `SILLOGIC_${context.field}_${Date.now()}.md`;
+    a.download = `ProtoChat_${context.field}_${Date.now()}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -776,7 +775,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
         </div>
         <div className="mt-3 flex justify-between px-2 text-[10px] text-gray-700 font-mono uppercase tracking-widest max-w-4xl mx-auto">
             <div className="flex items-center gap-4">
-                <span>SILLOGIC v4.0</span>
+                <span>ProtoChat v4.0</span>
                 <span className={`text-${themeColor}-500/80 flex items-center gap-1`}>
                     <Command size={10} className="inline"/> + ENTER TO SEND
                 </span>

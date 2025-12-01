@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
@@ -212,7 +210,7 @@ const App: React.FC = () => {
         <BrainCircuit className="w-12 h-12 text-blue-400" />
       </div>
       <h1 className="text-6xl md:text-8xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-white to-blue-200 text-center tracking-tighter mb-6 font-mono">
-        SILLOGIC
+        ProtoChat
       </h1>
       <p className="text-gray-400 text-lg md:text-xl max-w-2xl text-center mb-12 font-light">
         The ultimate research companion. Exploring the intersection of mathematical beauty and artificial intelligence.

@@ -1,10 +1,9 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ResearchField, ResearchTask, ModelProvider, AgentConfig } from "../types";
 
 // Helper to get detailed system instructions
 export const getSystemInstruction = (field: ResearchField, task: ResearchTask): string => {
-  const baseIdentity = `You are SILLOGIC, a world-class research assistant specialized in **${field}**. 
+  const baseIdentity = `You are ProtoChat, a world-class research assistant specialized in **${field}**. 
   Your demeanor is professional, academic, and rigorous. 
   You prioritize accuracy, citation of standard theories, and logical consistency.`;
 

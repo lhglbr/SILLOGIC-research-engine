@@ -1,5 +1,5 @@
 {
-  "name": "SILLOGIC - Scientific Research LLM Hub",
+  "name": "ProtoChat - Scientific Research LLM Hub",
   "description": "A specialized AI research assistant featuring a multi-model architecture tailored for scientists. Includes 3D mathematical visualization and deep research capabilities using Gemini 2.5 and 3.0 models.",
   "requestFramePermissions": []
 }

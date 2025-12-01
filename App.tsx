@@ -1,81 +1,82 @@
 
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
 import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench } from 'lucide-react';
 
 // --- Configuration per Field ---
 const FIELD_CONFIG = {
-  [ResearchField.PHYSICS]: {
+  [ResearchField.PHYSICAL]: {
     color: 'violet',
     icon: Atom,
-    description: "Quantum mechanics, Astrophysics, Relativity",
+    description: "Physics, Chemistry, Astronomy, Earth Sciences",
     themeClass: "from-violet-500 to-purple-600",
     borderClass: "border-violet-500/50",
     bgClass: "bg-violet-900/20",
     tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "Literature Review", desc: "ArXiv & APS synthesis", icon: FileSearch },
-      { id: ResearchTask.DATA_ANALYSIS, title: "Simulation Data", desc: "Analyze experimental datasets", icon: BarChart },
-      { id: ResearchTask.IDEA_GENERATION, title: "Theory Derivation", desc: "Brainstorm mathematical models", icon: Sigma },
+      { id: ResearchTask.DEEP_SEARCH, title: "Literature Review", desc: "ArXiv/APS synthesis", icon: FileSearch },
+      { id: ResearchTask.DATA_ANALYSIS, title: "Experimental Data", desc: "Analyze raw datasets", icon: BarChart },
+      { id: ResearchTask.IDEA_GENERATION, title: "Theory Modeling", desc: "Derive physical models", icon: Sigma },
     ]
   },
-  [ResearchField.BIOLOGY]: {
+  [ResearchField.LIFE]: {
     color: 'emerald',
     icon: Microscope,
-    description: "Genomics, Proteomics, Bioinformatics",
+    description: "Biology, Medicine, Genetics, Ecology",
     themeClass: "from-emerald-400 to-green-600",
     borderClass: "border-emerald-500/50",
     bgClass: "bg-emerald-900/20",
     tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "PubMed Search", desc: "Find recent protocols", icon: FileSearch },
-      { id: ResearchTask.DATA_ANALYSIS, title: "Bioinformatics", desc: "Sequence & protein analysis", icon: TestTube },
-      { id: ResearchTask.PAPER_EDITING, title: "Lab Report Polish", desc: "Format for Nature/Cell", icon: PenTool },
+      { id: ResearchTask.DEEP_SEARCH, title: "Protocol Search", desc: "Methods & Clinical trials", icon: FileSearch },
+      { id: ResearchTask.DATA_ANALYSIS, title: "Bio-Data Analysis", desc: "Genomic/Proteomic data", icon: TestTube },
+      { id: ResearchTask.PAPER_EDITING, title: "Manuscript Polish", desc: "Format for high-impact journals", icon: PenTool },
     ]
   },
-  [ResearchField.CS]: {
+  [ResearchField.FORMAL]: {
     color: 'cyan',
     icon: Binary,
-    description: "AI/ML, Algorithms, Systems",
+    description: "Mathematics, Computer Science, Logic, Statistics",
     themeClass: "from-cyan-400 to-blue-600",
     borderClass: "border-cyan-500/50",
     bgClass: "bg-cyan-900/20",
     tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "Tech Stack Review", desc: "Compare frameworks & tools", icon: Network },
-      { id: ResearchTask.DATA_ANALYSIS, title: "Code Analysis", desc: "Debug & Optimize algorithms", icon: Code },
-      { id: ResearchTask.IDEA_GENERATION, title: "System Design", desc: "Architect scalable solutions", icon: BrainCircuit },
+      { id: ResearchTask.IDEA_GENERATION, title: "Proof Assistant", desc: "Verify logic & theorems", icon: BrainCircuit },
+      { id: ResearchTask.DATA_ANALYSIS, title: "Algorithm Analysis", desc: "Optimize code & complexity", icon: Code },
+      { id: ResearchTask.PAPER_READING, title: "Technical Breakdown", desc: "Simplify complex papers", icon: FileText },
     ]
   },
-  [ResearchField.MATH]: {
+  [ResearchField.ENGINEERING]: {
     color: 'amber',
-    icon: Sigma,
-    description: "Topology, Number Theory, Analysis",
+    icon: Wrench,
+    description: "Civil, Mechanical, Electrical, Chemical Engineering",
     themeClass: "from-amber-400 to-orange-600",
     borderClass: "border-amber-500/50",
     bgClass: "bg-amber-900/20",
     tasks: [
-      { id: ResearchTask.IDEA_GENERATION, title: "Proof Assistant", desc: "Verify logical steps", icon: Sparkles },
-      { id: ResearchTask.PAPER_READING, title: "Paper Deconstruction", desc: "Simplify complex theorems", icon: FileText },
-      { id: ResearchTask.PAPER_EDITING, title: "LaTeX Formatting", desc: "Fix equation syntax", icon: PenTool },
+      { id: ResearchTask.DEEP_SEARCH, title: "State of Art Review", desc: "Patents & Standards", icon: FileSearch },
+      { id: ResearchTask.IDEA_GENERATION, title: "System Design", desc: "Architectural solutions", icon: Sparkles },
+      { id: ResearchTask.PAPER_EDITING, title: "Technical Report", desc: "Documentation & proposals", icon: PenTool },
     ]
   },
   [ResearchField.SOCIAL]: {
     color: 'rose',
     icon: Users,
-    description: "Psychology, Sociology, Economics",
+    description: "Psychology, Sociology, Economics, Political Science",
     themeClass: "from-rose-400 to-pink-600",
     borderClass: "border-rose-500/50",
     bgClass: "bg-rose-900/20",
     tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "Lit Synthesis", desc: "Qualitative meta-analysis", icon: Feather },
-      { id: ResearchTask.DATA_ANALYSIS, title: "SPSS/R Stats", desc: "Survey data interpretation", icon: PieChart },
-      { id: ResearchTask.IDEA_GENERATION, title: "Study Design", desc: "Methodology planning", icon: Users },
+      { id: ResearchTask.DEEP_SEARCH, title: "Qualitative Synthesis", desc: "Meta-analysis & Theory", icon: Feather },
+      { id: ResearchTask.DATA_ANALYSIS, title: "Statistical Analysis", desc: "SPSS/R/Stata interpretation", icon: PieChart },
+      { id: ResearchTask.IDEA_GENERATION, title: "Methodology Design", desc: "Survey & experiment setup", icon: Users },
     ]
   },
   [ResearchField.GENERAL]: {
     color: 'blue',
     icon: Globe,
-    description: "Interdisciplinary Studies",
+    description: "Interdisciplinary & General Studies",
     themeClass: "from-blue-400 to-indigo-600",
     borderClass: "border-blue-500/50",
     bgClass: "bg-blue-900/20",
@@ -221,10 +222,10 @@ const App: React.FC = () => {
 
   const FieldSelectView = () => (
     <div className="h-screen flex flex-col items-center justify-center z-10 relative p-8">
-      <h2 className="text-3xl font-bold text-white mb-2">Select Research Field</h2>
-      <p className="text-gray-400 mb-10">Define the academic context for the AI model.</p>
+      <h2 className="text-3xl font-bold text-white mb-2">Select Research Discipline</h2>
+      <p className="text-gray-400 mb-10">Define the broad academic context for the AI model.</p>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl w-full">
         {(Object.keys(FIELD_CONFIG) as ResearchField[]).map((fieldKey) => {
           const config = FIELD_CONFIG[fieldKey];
           return (

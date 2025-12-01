@@ -1,4 +1,5 @@
 
+
 export enum AppView {
   LANDING = 'LANDING',
   FIELD_SELECT = 'FIELD_SELECT',
@@ -7,11 +8,11 @@ export enum AppView {
 }
 
 export enum ResearchField {
-  PHYSICS = 'Theoretical Physics',
-  BIOLOGY = 'Molecular Biology & Genetics',
-  CS = 'Computer Science & AI',
-  MATH = 'Applied Mathematics',
-  SOCIAL = 'Social Sciences & Psychology',
+  PHYSICAL = 'Physical Sciences',
+  LIFE = 'Life Sciences',
+  FORMAL = 'Formal Sciences',
+  ENGINEERING = 'Engineering & Technology',
+  SOCIAL = 'Social Sciences & Humanities',
   GENERAL = 'General Research'
 }
 
@@ -25,11 +26,11 @@ export enum ResearchTask {
 
 export enum ModelProvider {
   GEMINI_FLASH = 'gemini-2.5-flash',
-  GEMINI_FLASH_LITE = 'gemini-2.5-flash-lite', // Added
+  GEMINI_FLASH_LITE = 'gemini-2.5-flash-lite',
   GEMINI_PRO = 'gemini-3-pro-preview',
   GEMINI_THINKING = 'gemini-3-pro-preview-thinking',
-  GEMINI_EXP = 'gemini-exp-1206', // Added
-  LEARN_LM = 'learnlm-1.5-pro-experimental', // Added (Simulated via System Prompt)
+  GEMINI_EXP = 'gemini-exp-1206',
+  LEARN_LM = 'learnlm-1.5-pro-experimental',
 }
 
 export interface MultiModelResponse {
@@ -43,10 +44,10 @@ export interface MultiModelResponse {
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
-  content: string; // Fallback content or user message
+  content: string;
   timestamp: number;
-  isThinking?: boolean; // Legacy single model flag
-  multiResponses?: MultiModelResponse[]; // Array for parallel responses
+  isThinking?: boolean;
+  multiResponses?: MultiModelResponse[];
 }
 
 export interface AgentConfig {
@@ -57,6 +58,6 @@ export interface AgentConfig {
 export interface UserContext {
   field?: ResearchField;
   task?: ResearchTask;
-  models: ModelProvider[]; // Changed to array for multi-select
+  models: ModelProvider[];
   config?: AgentConfig;
 }

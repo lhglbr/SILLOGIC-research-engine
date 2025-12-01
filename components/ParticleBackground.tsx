@@ -1,3 +1,5 @@
+
+
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { ResearchField } from '../types';
@@ -8,12 +10,12 @@ interface ParticleBackgroundProps {
 
 // Map fields to RGB base colors
 const FIELD_COLORS: Record<string, { r: number, g: number, b: number }> = {
-  [ResearchField.PHYSICS]: { r: 0.5, g: 0.0, b: 1.0 }, // Violet
-  [ResearchField.BIOLOGY]: { r: 0.0, g: 1.0, b: 0.4 }, // Emerald
-  [ResearchField.CS]: { r: 0.0, g: 0.8, b: 1.0 },      // Cyan
-  [ResearchField.MATH]: { r: 1.0, g: 0.6, b: 0.0 },    // Amber
-  [ResearchField.SOCIAL]: { r: 1.0, g: 0.2, b: 0.5 },  // Rose
-  [ResearchField.GENERAL]: { r: 0.2, g: 0.4, b: 1.0 }, // Blue (Default)
+  [ResearchField.PHYSICAL]: { r: 0.5, g: 0.0, b: 1.0 },    // Violet
+  [ResearchField.LIFE]: { r: 0.0, g: 1.0, b: 0.4 },        // Emerald
+  [ResearchField.FORMAL]: { r: 0.0, g: 0.8, b: 1.0 },      // Cyan
+  [ResearchField.ENGINEERING]: { r: 1.0, g: 0.6, b: 0.0 }, // Amber
+  [ResearchField.SOCIAL]: { r: 1.0, g: 0.2, b: 0.5 },      // Rose
+  [ResearchField.GENERAL]: { r: 0.2, g: 0.4, b: 1.0 },     // Blue (Default)
 };
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
@@ -272,8 +274,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
           }
 
           // Color Update (Dynamic Gradient based on position factor + Theme color)
-          // We use the initial spatial distribution (initialColorParams) to maintain gradient variation
-          // even when shape changes, giving it a "glittering" internal structure.
           const variation = initialColorParams[idx]; 
           
           currentColors[idx]   = currentR * (0.2 + variation * 0.8);

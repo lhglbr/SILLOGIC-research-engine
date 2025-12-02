@@ -32,8 +32,10 @@
     "react-markdown": "https://esm.sh/react-markdown@9.0.1?external=react",
     "remark-math": "https://esm.sh/remark-math@6.0.0",
     "rehype-katex": "https://esm.sh/rehype-katex@7.0.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+    "remark-gfm": "https://esm.sh/remark-gfm@4.0.0",
+    "mermaid": "https://esm.sh/mermaid@10.6.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
   }
 }
 </script>
@@ -87,9 +89,32 @@
       .prose pre code { background: transparent; padding: 0; }
       .prose blockquote { border-left: 3px solid rgba(255,255,255,0.2); padding-left: 1em; font-style: italic; opacity: 0.8; }
       .prose a { color: #60a5fa; text-decoration: underline; }
-      .prose table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
-      .prose th, .prose td { border: 1px solid rgba(255,255,255,0.1); padding: 0.5em; text-align: left; }
-      .prose th { background: rgba(255,255,255,0.05); }
+      
+      /* Table Styles */
+      .prose table { 
+        width: 100%; 
+        border-collapse: separate; 
+        border-spacing: 0; 
+        margin-bottom: 1.5em; 
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .prose th, .prose td { 
+        padding: 0.75em 1em; 
+        text-align: left; 
+        border-bottom: 1px solid rgba(255,255,255,0.05); 
+      }
+      .prose th { 
+        background: rgba(255,255,255,0.1); 
+        font-weight: 600; 
+        color: #fff;
+        text-transform: uppercase;
+        font-size: 0.85em;
+        letter-spacing: 0.05em;
+      }
+      .prose tr:last-child td { border-bottom: none; }
+      .prose tr:hover td { background: rgba(255,255,255,0.02); }
       
       /* KaTeX Adjustments */
       .katex-display { margin: 1em 0; overflow-x: auto; overflow-y: hidden; }

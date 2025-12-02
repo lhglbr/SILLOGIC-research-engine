@@ -124,15 +124,13 @@ const simulateExternalModel = async (
             history: history
         });
         const result = await chat.sendMessageStream({ message: messageParts });
-        let fullText = "";
         for await (const chunk of result) {
             const text = (chunk as GenerateContentResponse).text;
             if (text) {
-                fullText += text;
                 onChunk(text);
             }
         }
-        return fullText;
+        return "";
     } catch (error) {
         console.error(`Simulation Error (${fallbackModel})`, error);
         throw error;
@@ -155,7 +153,8 @@ const callGoogleGenAI = async (
     switch (modelId) {
         case ModelProvider.GEMINI_THINKING:
             modelName = 'gemini-3-pro-preview';
-            config.thinkingConfig = { thinkingBudget: 2048 };
+            // Force Thinking behavior simulation via prompt if native budget isn't enough/supported in preview
+            config.systemInstruction += "\n\nIMPORTANT: You are a Thinking Model. You MUST output your internal reasoning process enclosed in <think>...</think> tags before providing the final answer. Show your step-by-step logic.";
             break;
         case ModelProvider.GEMINI_PRO:
             modelName = 'gemini-3-pro-preview';
@@ -204,13 +203,13 @@ const callOpenAI = async (
     onChunk: (text: string) => void
 ) => {
     console.log(`[API] Routing to OpenAI Interface for ${modelId}`);
-    // TODO: Integrate OpenAI SDK
-    // const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     
     // Fallback Simulation
     let persona = "";
     if (modelId === ModelProvider.OPENAI_GPT4O) persona = "\n\n[SYSTEM SIMULATION: GPT-4o]\nYou are acting as GPT-4o. Your style is concise, confident, and versatile.";
-    if (modelId === ModelProvider.OPENAI_O1) persona = "\n\n[SYSTEM SIMULATION: o1-preview]\nYou are acting as o1. You MUST engage in deep, verbose reasoning chains.";
+    if (modelId === ModelProvider.OPENAI_O1) {
+        persona = "\n\n[SYSTEM SIMULATION: o1-preview]\nYou are a Reasoning Model. You MUST output your hidden chain of thought enclosed in <think>...</think> tags before your final response. Be extremely verbose in your reasoning.";
+    }
     
     return simulateExternalModel(history, messageParts, config, persona, 'gemini-3-pro-preview', onChunk);
 };
@@ -226,7 +225,6 @@ const callAnthropic = async (
     onChunk: (text: string) => void
 ) => {
     console.log(`[API] Routing to Anthropic Interface for ${modelId}`);
-    // TODO: Integrate Anthropic SDK
     
     // Fallback Simulation
     const persona = "\n\n[SYSTEM SIMULATION: Claude 3.5 Sonnet]\nYou are acting as Claude 3.5 Sonnet. Your style is warm, nuanced, and excellent at formatting.";
@@ -263,7 +261,7 @@ const callDeepSeek = async (
     
     let persona = "";
     if (modelId === ModelProvider.DEEPSEEK_V3) persona = "\n\n[SYSTEM SIMULATION: DeepSeek V3]\nYou are acting as DeepSeek V3. Efficient and coding-focused.";
-    if (modelId === ModelProvider.DEEPSEEK_R1) persona = "\n\n[SYSTEM SIMULATION: DeepSeek R1]\nYou are acting as DeepSeek R1 (Reasoning). Prioritize math and logic.";
+    if (modelId === ModelProvider.DEEPSEEK_R1) persona = "\n\n[SYSTEM SIMULATION: DeepSeek R1]\nYou are a Reasoning Model. You MUST output your internal chain of thought enclosed in <think>...</think> tags before the final answer. Use this space to self-correct and analyze the problem deeply.";
 
     return simulateExternalModel(history, messageParts, config, persona, 'gemini-3-pro-preview', onChunk);
 };

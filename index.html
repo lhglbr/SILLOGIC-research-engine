@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class', // Enable class-based dark mode
         theme: {
           extend: {
             fontFamily: {
@@ -43,13 +44,19 @@
     <style>
       body {
         font-family: 'Agency FB', 'Rajdhani', sans-serif;
-        background-color: transparent; /* Changed to transparent to allow ParticleBackground to show */
-        color: #e5e5e5;
-        overflow: hidden; /* Manage scroll within app */
+        background-color: transparent; 
+        color: #1a1a1a; /* Default to dark text for light mode */
+        overflow: hidden; 
         margin: 0;
         padding: 0;
-        letter-spacing: 0.05em; /* Slightly increase spacing for condensed fonts */
+        letter-spacing: 0.05em; 
+        transition: background-color 0.3s ease, color 0.3s ease;
       }
+      /* Dark mode override via class */
+      .dark body {
+        color: #e5e5e5;
+      }
+      
       .font-mono {
         font-family: 'JetBrains Mono', monospace;
       }
@@ -58,38 +65,61 @@
         width: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #0f0f0f; 
+        background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #333; 
+        background: #ccc; 
         border-radius: 4px;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #555; 
+      .dark ::-webkit-scrollbar-thumb {
+        background: #333;
       }
+      .dark ::-webkit-scrollbar-track {
+        background: #0f0f0f;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #999; 
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+
       .glass-panel {
-        background: rgba(10, 10, 15, 0.6);
+        background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
       }
       
-      /* Enhance input placeholder visibility for Agency FB */
+      .dark .glass-panel {
+        background: rgba(10, 10, 15, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: none;
+      }
+      
+      /* Enhance input placeholder visibility */
       input::placeholder, textarea::placeholder {
         font-family: 'Agency FB', 'Rajdhani', sans-serif;
         letter-spacing: 0.05em;
       }
 
-      /* Markdown Styles */
+      /* Markdown Styles - Light Mode Default */
       .prose p { margin-bottom: 0.75em; }
       .prose h1, .prose h2, .prose h3 { color: inherit; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; }
       .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.75em; }
       .prose ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.75em; }
-      .prose code { background: rgba(255,255,255,0.1); padding: 0.2em 0.4em; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.9em; }
-      .prose pre { background: rgba(0,0,0,0.3); padding: 1em; border-radius: 8px; overflow-x: auto; margin-bottom: 1em; }
-      .prose pre code { background: transparent; padding: 0; }
-      .prose blockquote { border-left: 3px solid rgba(255,255,255,0.2); padding-left: 1em; font-style: italic; opacity: 0.8; }
-      .prose a { color: #60a5fa; text-decoration: underline; }
+      .prose code { background: rgba(0,0,0,0.05); padding: 0.2em 0.4em; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.9em; color: #d63384; }
+      .prose pre { background: #f3f4f6; padding: 1em; border-radius: 8px; overflow-x: auto; margin-bottom: 1em; color: #1f2937; }
+      .prose pre code { background: transparent; padding: 0; color: inherit; }
+      .prose blockquote { border-left: 3px solid rgba(0,0,0,0.1); padding-left: 1em; font-style: italic; opacity: 0.8; }
+      .prose a { color: #2563eb; text-decoration: underline; }
+      
+      /* Markdown Styles - Dark Mode Overrides */
+      .dark .prose code { background: rgba(255,255,255,0.1); color: #e5e5e5; }
+      .dark .prose pre { background: rgba(0,0,0,0.3); color: #e5e5e5; }
+      .dark .prose blockquote { border-left-color: rgba(255,255,255,0.2); }
+      .dark .prose a { color: #60a5fa; }
       
       /* Table Styles */
       .prose table { 
@@ -97,25 +127,35 @@
         border-collapse: separate; 
         border-spacing: 0; 
         margin-bottom: 1.5em; 
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid rgba(0,0,0,0.1);
         border-radius: 8px;
         overflow: hidden;
       }
+      .dark .prose table { border-color: rgba(255,255,255,0.1); }
+
       .prose th, .prose td { 
         padding: 0.75em 1em; 
         text-align: left; 
-        border-bottom: 1px solid rgba(255,255,255,0.05); 
+        border-bottom: 1px solid rgba(0,0,0,0.05); 
       }
+      .dark .prose th, .dark .prose td { border-bottom-color: rgba(255,255,255,0.05); }
+
       .prose th { 
-        background: rgba(255,255,255,0.1); 
+        background: rgba(0,0,0,0.05); 
         font-weight: 600; 
-        color: #fff;
+        color: #111;
         text-transform: uppercase;
         font-size: 0.85em;
         letter-spacing: 0.05em;
       }
+      .dark .prose th { 
+        background: rgba(255,255,255,0.1); 
+        color: #fff;
+      }
+
       .prose tr:last-child td { border-bottom: none; }
-      .prose tr:hover td { background: rgba(255,255,255,0.02); }
+      .prose tr:hover td { background: rgba(0,0,0,0.02); }
+      .dark .prose tr:hover td { background: rgba(255,255,255,0.02); }
       
       /* KaTeX Adjustments */
       .katex-display { margin: 1em 0; overflow-x: auto; overflow-y: hidden; }

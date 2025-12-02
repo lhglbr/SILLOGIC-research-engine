@@ -1,11 +1,10 @@
-
-
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { ResearchField } from '../types';
 
 interface ParticleBackgroundProps {
   field?: ResearchField;
+  isDarkMode: boolean;
 }
 
 // Map fields to RGB base colors
@@ -18,9 +17,14 @@ const FIELD_COLORS: Record<string, { r: number, g: number, b: number }> = {
   [ResearchField.GENERAL]: { r: 0.2, g: 0.4, b: 1.0 },     // Blue (Default)
 };
 
-const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
+const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field, isDarkMode }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const targetColorRef = useRef({ r: 0.2, g: 0.4, b: 1.0 });
+
+  // Refs to access THREE objects inside useEffect without dependencies issues
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const materialRef = useRef<THREE.PointsMaterial | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
 
   useEffect(() => {
     // Update target color when field changes
@@ -31,12 +35,29 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
     }
   }, [field]);
 
+  // Update scene based on Dark Mode
+  useEffect(() => {
+    if (sceneRef.current && rendererRef.current && materialRef.current) {
+        const bgHex = isDarkMode ? 0x000000 : 0xf9fafb; // Black vs Gray-50
+        sceneRef.current.fog = new THREE.FogExp2(bgHex, 0.002);
+        
+        // Use blending that works for the mode
+        // Additive looks great on black (glowing). 
+        // Normal/Multiply is better for white (dots).
+        materialRef.current.blending = isDarkMode ? THREE.AdditiveBlending : THREE.NormalBlending;
+        materialRef.current.opacity = isDarkMode ? 0.9 : 0.6;
+        materialRef.current.needsUpdate = true;
+    }
+  }, [isDarkMode]);
+
   useEffect(() => {
     if (!mountRef.current) return;
 
     // --- Setup ---
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x000000, 0.002); // Darker fog for contrast
+    const bgHex = isDarkMode ? 0x000000 : 0xf9fafb;
+    scene.fog = new THREE.FogExp2(bgHex, 0.002); 
+    sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -56,6 +77,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0); 
+    rendererRef.current = renderer;
     
     renderer.domElement.style.display = 'block';
     
@@ -206,18 +228,16 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
     // 8. Archimedean Spiral (Planar Galaxy)
     const shape7 = new Float32Array(particleCount * 3);
     for(let i=0; i<particleCount; i++){
-        // Multiple arms for visual density (3 arms)
         const arm = i % 3;
         const pointsPerArm = particleCount / 3;
-        const t = (Math.floor(i/3) / pointsPerArm) * 12 * Math.PI; // Theta max
+        const t = (Math.floor(i/3) / pointsPerArm) * 12 * Math.PI; 
         
-        // r = a + b * theta
         const r = 2 + 0.8 * t;
-        const angle = t + (arm * (2 * Math.PI / 3)); // Offset arms by 120 degrees
+        const angle = t + (arm * (2 * Math.PI / 3)); 
         
         const x = r * Math.cos(angle);
         const z = r * Math.sin(angle);
-        const y = (Math.random() - 0.5) * (r * 0.2); // Increase thickness at edges
+        const y = (Math.random() - 0.5) * (r * 0.2); 
         
         shape7[i*3] = x;
         shape7[i*3+1] = y;
@@ -251,11 +271,12 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
       size: 1.0,
       vertexColors: true,
       map: getTexture(),
-      blending: THREE.AdditiveBlending,
+      blending: isDarkMode ? THREE.AdditiveBlending : THREE.NormalBlending, // Switch blending for light mode visibility
       depthWrite: false,
       transparent: true,
-      opacity: 0.9
+      opacity: isDarkMode ? 0.9 : 0.6
     });
+    materialRef.current = material;
 
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
@@ -307,26 +328,33 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
       const sourceShape = shapes[currentShapeIndex];
       const targetShape = shapes[nextShapeIndex];
       
-      // Morph Ease
       const ease = (t: number) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
       const alpha = ease(transitionProgress);
 
       for (let i = 0; i < particleCount; i++) {
           const idx = i * 3;
           
-          // Position Update
           if (transitionProgress > 0) {
               currentPositions[idx] = sourceShape[idx] + (targetShape[idx] - sourceShape[idx]) * alpha;
               currentPositions[idx+1] = sourceShape[idx+1] + (targetShape[idx+1] - sourceShape[idx+1]) * alpha;
               currentPositions[idx+2] = sourceShape[idx+2] + (targetShape[idx+2] - sourceShape[idx+2]) * alpha;
           }
 
-          // Color Update (Dynamic Gradient based on position factor + Theme color)
           const variation = initialColorParams[idx]; 
           
-          currentColors[idx]   = currentR * (0.2 + variation * 0.8);
-          currentColors[idx+1] = currentG * (0.2 + variation * 0.8);
-          currentColors[idx+2] = currentB * (0.2 + variation * 0.8);
+          // In Light mode, we want darker colors (closer to 0) for visibility on white
+          // In Dark mode, we want bright colors (closer to target) for glow
+          if (isDarkMode) {
+              currentColors[idx]   = currentR * (0.2 + variation * 0.8);
+              currentColors[idx+1] = currentG * (0.2 + variation * 0.8);
+              currentColors[idx+2] = currentB * (0.2 + variation * 0.8);
+          } else {
+              // Inverse brightness + Saturation boost for light mode
+              // Making them look like "Ink" points
+              currentColors[idx]   = currentR * 0.8;
+              currentColors[idx+1] = currentG * 0.8;
+              currentColors[idx+2] = currentB * 0.8;
+          }
       }
       
       if (transitionProgress > 0) posAttr.needsUpdate = true;
@@ -357,9 +385,9 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field }) => {
       material.dispose();
       renderer.dispose();
     };
-  }, []);
+  }, [isDarkMode]); // Re-run effect if dark mode toggles to update context/materials
 
-  return <div ref={mountRef} className="absolute inset-0 w-full h-full z-0 bg-black pointer-events-none" />;
+  return <div ref={mountRef} className="absolute inset-0 w-full h-full z-0 bg-transparent pointer-events-none" />;
 };
 
 export default ParticleBackground;

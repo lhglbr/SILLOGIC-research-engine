@@ -1,121 +1,204 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
 import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages } from 'lucide-react';
 
-// --- Configuration per Field ---
-const FIELD_CONFIG = {
-  [ResearchField.PHYSICAL]: {
-    color: 'violet',
-    icon: Atom,
-    description: "Physics, Chemistry, Astronomy, Earth Sciences",
-    themeClass: "from-violet-500 to-purple-600",
-    borderClass: "dark:border-violet-500/50 border-violet-500/30",
-    bgClass: "dark:bg-violet-900/20 bg-violet-100/50",
-    tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "Literature Review", desc: "ArXiv/APS synthesis", icon: FileSearch },
-      { id: ResearchTask.DATA_ANALYSIS, title: "Experimental Data", desc: "Analyze raw datasets", icon: BarChart },
-      { id: ResearchTask.CAD_DESIGN, title: "Instrument Design", desc: "Schematics & Blueprints", icon: Grid },
-    ]
+// --- Localization Resources ---
+
+const APP_TEXT = {
+  en: {
+    landingTitle: "ProtoChat",
+    landingSubtitle: "The ultimate research companion. Exploring the intersection of mathematical beauty and artificial intelligence.",
+    initResearch: "Initialize Research",
+    footer: "Powered by Gemini • Three.js • React",
+    selectFieldTitle: "Select Research Discipline",
+    selectFieldSubtitle: "Define the broad academic context for the AI model.",
+    cancel: "Cancel",
+    workspaceTitle: "Workspace",
+    selectToolSubtitle: "Select a specialized research tool for this domain.",
+    toolsTitle: "Research Tools",
+    engineClusterTitle: "Engine Cluster",
+    engineClusterSubtitle: "Select up to 3 for comparison",
+    selectedEngines: "Selected Engines",
+    selectModels: "Select Models",
+    modelCount: (c: number) => `${c} Model${c > 1 ? 's' : ''} Selected`,
+    maxModels: "MAXIMUM 3 MODELS SIMULTANEOUSLY",
+    back: "← Back",
+    launch: "Launch Workspace",
   },
-  [ResearchField.LIFE]: {
-    color: 'emerald',
-    icon: Microscope,
-    description: "Biology, Medicine, Genetics, Ecology",
-    themeClass: "from-emerald-400 to-green-600",
-    borderClass: "dark:border-emerald-500/50 border-emerald-500/30",
-    bgClass: "dark:bg-emerald-900/20 bg-emerald-100/50",
-    tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "Protocol Search", desc: "Methods & Clinical trials", icon: FileSearch },
-      { id: ResearchTask.DATA_ANALYSIS, title: "Bio-Data Analysis", desc: "Genomic/Proteomic data", icon: TestTube },
-      { id: ResearchTask.PAPER_EDITING, title: "Manuscript Polish", desc: "Format for high-impact journals", icon: PenTool },
-    ]
-  },
-  [ResearchField.FORMAL]: {
-    color: 'cyan',
-    icon: Binary,
-    description: "Mathematics, Computer Science, Logic, Statistics",
-    themeClass: "from-cyan-400 to-blue-600",
-    borderClass: "dark:border-cyan-500/50 border-cyan-500/30",
-    bgClass: "dark:bg-cyan-900/20 bg-cyan-100/50",
-    tasks: [
-      { id: ResearchTask.IDEA_GENERATION, title: "Proof Assistant", desc: "Verify logic & theorems", icon: BrainCircuit },
-      { id: ResearchTask.DATA_ANALYSIS, title: "Algorithm Analysis", desc: "Optimize code & complexity", icon: Code },
-      { id: ResearchTask.PAPER_READING, title: "Technical Breakdown", desc: "Simplify complex papers", icon: FileText },
-    ]
-  },
-  [ResearchField.ENGINEERING]: {
-    color: 'amber',
-    icon: Wrench,
-    description: "Civil, Mechanical, Electrical, Chemical Engineering",
-    themeClass: "from-amber-400 to-orange-600",
-    borderClass: "dark:border-amber-500/50 border-amber-500/30",
-    bgClass: "dark:bg-amber-900/20 bg-amber-100/50",
-    tasks: [
-      { id: ResearchTask.CAD_DESIGN, title: "CAD & Schematics", desc: "Circuits, PCBs, Floorplans", icon: Layers },
-      { id: ResearchTask.IDEA_GENERATION, title: "System Design", desc: "Architectural solutions", icon: Sparkles },
-      { id: ResearchTask.PAPER_EDITING, title: "Technical Report", desc: "Documentation & proposals", icon: PenTool },
-    ]
-  },
-  [ResearchField.SOCIAL]: {
-    color: 'rose',
-    icon: Users,
-    description: "Psychology, Sociology, Economics, Political Science",
-    themeClass: "from-rose-400 to-pink-600",
-    borderClass: "dark:border-rose-500/50 border-rose-500/30",
-    bgClass: "dark:bg-rose-900/20 bg-rose-100/50",
-    tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "Qualitative Synthesis", desc: "Meta-analysis & Theory", icon: Feather },
-      { id: ResearchTask.DATA_ANALYSIS, title: "Statistical Analysis", desc: "SPSS/R/Stata interpretation", icon: PieChart },
-      { id: ResearchTask.IDEA_GENERATION, title: "Methodology Design", desc: "Survey & experiment setup", icon: Users },
-    ]
-  },
-  [ResearchField.GENERAL]: {
-    color: 'blue',
-    icon: Globe,
-    description: "Interdisciplinary & General Studies",
-    themeClass: "from-blue-400 to-indigo-600",
-    borderClass: "dark:border-blue-500/50 border-blue-500/30",
-    bgClass: "dark:bg-blue-900/20 bg-blue-100/50",
-    tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "Deep Research", desc: "Comprehensive review", icon: FileSearch },
-      { id: ResearchTask.CAD_DESIGN, title: "Blueprint Gen", desc: "Generate technical drawings", icon: Grid },
-      { id: ResearchTask.PAPER_EDITING, title: "Academic Editing", desc: "Polish writing", icon: PenTool },
-      { id: ResearchTask.DATA_ANALYSIS, title: "Data Analysis", desc: "Statistical consulting", icon: BarChart },
-      { id: ResearchTask.IDEA_GENERATION, title: "Hypothesis Gen", desc: "Brainstorming ideas", icon: Sparkles },
-    ]
-  },
+  zh: {
+    landingTitle: "ProtoChat",
+    landingSubtitle: "您的终极科研伴侣。探索数学之美与人工智能的交汇点。",
+    initResearch: "开始研究",
+    footer: "由 Gemini • Three.js • React 驱动",
+    selectFieldTitle: "选择研究学科",
+    selectFieldSubtitle: "为 AI 模型定义广泛的学术背景。",
+    cancel: "取消",
+    workspaceTitle: "工作区",
+    selectToolSubtitle: "为此领域选择专门的研究工具。",
+    toolsTitle: "研究工具",
+    engineClusterTitle: "引擎集群",
+    engineClusterSubtitle: "最多选择 3 个进行对比",
+    selectedEngines: "已选引擎",
+    selectModels: "选择模型",
+    modelCount: (c: number) => `已选 ${c} 个模型`,
+    maxModels: "同时最多支持 3 个模型",
+    back: "← 返回",
+    launch: "启动工作区",
+  }
 };
 
-const MODELS_LIST = [
-  // Google
-  { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Google • Fast & Multimodal", icon: Zap },
-  { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Google • Complex Reasoning", icon: Cpu },
-  { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Google • Deep Logic", icon: BrainCircuit },
-  
-  // OpenAI
-  { id: ModelProvider.OPENAI_GPT4O, name: "GPT-4o", desc: "OpenAI • Omni Model", icon: MessageSquare },
-  { id: ModelProvider.OPENAI_O1, name: "o1-preview", desc: "OpenAI • Reasoning Chain", icon: Sparkles },
+const FIELD_LABELS = {
+  en: {
+    [ResearchField.PHYSICAL]: "Physical Sciences",
+    [ResearchField.LIFE]: "Life Sciences",
+    [ResearchField.FORMAL]: "Formal Sciences",
+    [ResearchField.ENGINEERING]: "Engineering & Tech",
+    [ResearchField.SOCIAL]: "Social Sciences",
+    [ResearchField.GENERAL]: "General Research"
+  },
+  zh: {
+    [ResearchField.PHYSICAL]: "物理科学",
+    [ResearchField.LIFE]: "生命科学",
+    [ResearchField.FORMAL]: "形式科学",
+    [ResearchField.ENGINEERING]: "工程与技术",
+    [ResearchField.SOCIAL]: "社会科学",
+    [ResearchField.GENERAL]: "综合研究"
+  }
+};
 
-  // Anthropic
-  { id: ModelProvider.CLAUDE_3_5_SONNET, name: "Claude 3.5 Sonnet", desc: "Anthropic • Coding & Nuance", icon: Hexagon },
+// --- Configuration Helper ---
 
-  // DeepSeek
-  { id: ModelProvider.DEEPSEEK_V3, name: "DeepSeek V3", desc: "DeepSeek • Efficient SOTA", icon: Flame },
-  { id: ModelProvider.DEEPSEEK_R1, name: "DeepSeek R1", desc: "DeepSeek • Math Specialist", icon: Binary },
+const getFieldConfig = (lang: 'en' | 'zh') => {
+  const isZh = lang === 'zh';
+  return {
+    [ResearchField.PHYSICAL]: {
+      color: 'violet',
+      icon: Atom,
+      label: FIELD_LABELS[lang][ResearchField.PHYSICAL],
+      description: isZh ? "物理学、化学、天文学、地球科学" : "Physics, Chemistry, Astronomy, Earth Sciences",
+      themeClass: "from-violet-500 to-purple-600",
+      borderClass: "dark:border-violet-500/50 border-violet-500/30",
+      bgClass: "dark:bg-violet-900/20 bg-violet-100/50",
+      tasks: [
+        { id: ResearchTask.DEEP_SEARCH, title: isZh ? "深度文献综述" : "Literature Review", desc: isZh ? "ArXiv/APS 综合研究" : "ArXiv/APS synthesis", icon: FileSearch },
+        { id: ResearchTask.DATA_ANALYSIS, title: isZh ? "实验数据分析" : "Experimental Data", desc: isZh ? "分析原始数据集" : "Analyze raw datasets", icon: BarChart },
+        { id: ResearchTask.CAD_DESIGN, title: isZh ? "仪器设计" : "Instrument Design", desc: isZh ? "原理图与蓝图" : "Schematics & Blueprints", icon: Grid },
+      ]
+    },
+    [ResearchField.LIFE]: {
+      color: 'emerald',
+      icon: Microscope,
+      label: FIELD_LABELS[lang][ResearchField.LIFE],
+      description: isZh ? "生物学、医学、遗传学、生态学" : "Biology, Medicine, Genetics, Ecology",
+      themeClass: "from-emerald-400 to-green-600",
+      borderClass: "dark:border-emerald-500/50 border-emerald-500/30",
+      bgClass: "dark:bg-emerald-900/20 bg-emerald-100/50",
+      tasks: [
+        { id: ResearchTask.DEEP_SEARCH, title: isZh ? "方案与实验搜索" : "Protocol Search", desc: isZh ? "方法论与临床试验" : "Methods & Clinical trials", icon: FileSearch },
+        { id: ResearchTask.DATA_ANALYSIS, title: isZh ? "生物数据分析" : "Bio-Data Analysis", desc: isZh ? "基因组/蛋白质组数据" : "Genomic/Proteomic data", icon: TestTube },
+        { id: ResearchTask.PAPER_EDITING, title: isZh ? "论文润色" : "Manuscript Polish", desc: isZh ? "高影响力期刊格式" : "Format for high-impact journals", icon: PenTool },
+      ]
+    },
+    [ResearchField.FORMAL]: {
+      color: 'cyan',
+      icon: Binary,
+      label: FIELD_LABELS[lang][ResearchField.FORMAL],
+      description: isZh ? "数学、计算机科学、逻辑学、统计学" : "Mathematics, Computer Science, Logic, Statistics",
+      themeClass: "from-cyan-400 to-blue-600",
+      borderClass: "dark:border-cyan-500/50 border-cyan-500/30",
+      bgClass: "dark:bg-cyan-900/20 bg-cyan-100/50",
+      tasks: [
+        { id: ResearchTask.IDEA_GENERATION, title: isZh ? "证明助手" : "Proof Assistant", desc: isZh ? "验证逻辑与定理" : "Verify logic & theorems", icon: BrainCircuit },
+        { id: ResearchTask.DATA_ANALYSIS, title: isZh ? "算法分析" : "Algorithm Analysis", desc: isZh ? "优化代码与复杂度" : "Optimize code & complexity", icon: Code },
+        { id: ResearchTask.PAPER_READING, title: isZh ? "技术拆解" : "Technical Breakdown", desc: isZh ? "简化复杂论文" : "Simplify complex papers", icon: FileText },
+      ]
+    },
+    [ResearchField.ENGINEERING]: {
+      color: 'amber',
+      icon: Wrench,
+      label: FIELD_LABELS[lang][ResearchField.ENGINEERING],
+      description: isZh ? "土木、机械、电气、化学工程" : "Civil, Mechanical, Electrical, Chemical Engineering",
+      themeClass: "from-amber-400 to-orange-600",
+      borderClass: "dark:border-amber-500/50 border-amber-500/30",
+      bgClass: "dark:bg-amber-900/20 bg-amber-100/50",
+      tasks: [
+        { id: ResearchTask.CAD_DESIGN, title: isZh ? "CAD 与原理图" : "CAD & Schematics", desc: isZh ? "电路、PCB、平面图" : "Circuits, PCBs, Floorplans", icon: Layers },
+        { id: ResearchTask.IDEA_GENERATION, title: isZh ? "系统设计" : "System Design", desc: isZh ? "架构解决方案" : "Architectural solutions", icon: Sparkles },
+        { id: ResearchTask.PAPER_EDITING, title: isZh ? "技术报告" : "Technical Report", desc: isZh ? "文档与提案" : "Documentation & proposals", icon: PenTool },
+      ]
+    },
+    [ResearchField.SOCIAL]: {
+      color: 'rose',
+      icon: Users,
+      label: FIELD_LABELS[lang][ResearchField.SOCIAL],
+      description: isZh ? "心理学、社会学、经济学、政治学" : "Psychology, Sociology, Economics, Political Science",
+      themeClass: "from-rose-400 to-pink-600",
+      borderClass: "dark:border-rose-500/50 border-rose-500/30",
+      bgClass: "dark:bg-rose-900/20 bg-rose-100/50",
+      tasks: [
+        { id: ResearchTask.DEEP_SEARCH, title: isZh ? "定性综合" : "Qualitative Synthesis", desc: isZh ? "元分析与理论" : "Meta-analysis & Theory", icon: Feather },
+        { id: ResearchTask.DATA_ANALYSIS, title: isZh ? "统计分析" : "Statistical Analysis", desc: isZh ? "SPSS/R/Stata 解释" : "SPSS/R/Stata interpretation", icon: PieChart },
+        { id: ResearchTask.IDEA_GENERATION, title: isZh ? "方法论设计" : "Methodology Design", desc: isZh ? "调查与实验设置" : "Survey & experiment setup", icon: Users },
+      ]
+    },
+    [ResearchField.GENERAL]: {
+      color: 'blue',
+      icon: Globe,
+      label: FIELD_LABELS[lang][ResearchField.GENERAL],
+      description: isZh ? "跨学科与综合研究" : "Interdisciplinary & General Studies",
+      themeClass: "from-blue-400 to-indigo-600",
+      borderClass: "dark:border-blue-500/50 border-blue-500/30",
+      bgClass: "dark:bg-blue-900/20 bg-blue-100/50",
+      tasks: [
+        { id: ResearchTask.DEEP_SEARCH, title: isZh ? "深度研究" : "Deep Research", desc: isZh ? "综合综述" : "Comprehensive review", icon: FileSearch },
+        { id: ResearchTask.CAD_DESIGN, title: isZh ? "蓝图生成" : "Blueprint Gen", desc: isZh ? "生成技术图纸" : "Generate technical drawings", icon: Grid },
+        { id: ResearchTask.PAPER_EDITING, title: isZh ? "学术编辑" : "Academic Editing", desc: isZh ? "润色写作" : "Polish writing", icon: PenTool },
+        { id: ResearchTask.DATA_ANALYSIS, title: isZh ? "数据分析" : "Data Analysis", desc: isZh ? "统计咨询" : "Statistical consulting", icon: BarChart },
+        { id: ResearchTask.IDEA_GENERATION, title: isZh ? "假设生成" : "Hypothesis Gen", desc: isZh ? "头脑风暴" : "Brainstorming ideas", icon: Sparkles },
+      ]
+    },
+  };
+};
 
-  // Groq / Meta
-  { id: ModelProvider.GROQ_LLAMA_3, name: "Llama 3 70B", desc: "Meta/Groq • Ultra Low Latency", icon: Zap },
-];
+const getModelsList = (lang: 'en' | 'zh') => {
+  const isZh = lang === 'zh';
+  return [
+    // Google
+    { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: isZh ? "Google • 快速 & 多模态" : "Google • Fast & Multimodal", icon: Zap },
+    { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: isZh ? "Google • 复杂推理" : "Google • Complex Reasoning", icon: Cpu },
+    { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: isZh ? "Google • 深度逻辑" : "Google • Deep Logic", icon: BrainCircuit },
+    
+    // OpenAI
+    { id: ModelProvider.OPENAI_GPT4O, name: "GPT-4o", desc: isZh ? "OpenAI • 全能模型" : "OpenAI • Omni Model", icon: MessageSquare },
+    { id: ModelProvider.OPENAI_O1, name: "o1-preview", desc: isZh ? "OpenAI • 推理链" : "OpenAI • Reasoning Chain", icon: Sparkles },
+
+    // Anthropic
+    { id: ModelProvider.CLAUDE_3_5_SONNET, name: "Claude 3.5 Sonnet", desc: isZh ? "Anthropic • 编码 & 细节" : "Anthropic • Coding & Nuance", icon: Hexagon },
+
+    // DeepSeek
+    { id: ModelProvider.DEEPSEEK_V3, name: "DeepSeek V3", desc: isZh ? "DeepSeek • 高效 SOTA" : "DeepSeek • Efficient SOTA", icon: Flame },
+    { id: ModelProvider.DEEPSEEK_R1, name: "DeepSeek R1", desc: isZh ? "DeepSeek • 数学专家" : "DeepSeek • Math Specialist", icon: Binary },
+
+    // Groq / Meta
+    { id: ModelProvider.GROQ_LLAMA_3, name: "Llama 3 70B", desc: isZh ? "Meta/Groq • 超低延迟" : "Meta/Groq • Ultra Low Latency", icon: Zap },
+  ];
+};
+
+// --- Components ---
 
 const ModelDropdown: React.FC<{ 
   selectedModels: ModelProvider[], 
   onToggle: (id: ModelProvider) => void,
-  themeColor: string
-}> = ({ selectedModels, onToggle, themeColor }) => {
+  themeColor: string,
+  lang: 'en' | 'zh',
+  modelsList: any[]
+}> = ({ selectedModels, onToggle, themeColor, lang, modelsList }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const txt = APP_TEXT[lang];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -136,11 +219,11 @@ const ModelDropdown: React.FC<{
         <div className="flex items-center gap-3">
           <Box size={20} className={`text-${themeColor}-500 dark:text-${themeColor}-400`} />
           <div className="text-left">
-            <div className="text-sm font-bold text-gray-800 dark:text-gray-200">Selected Engines</div>
+            <div className="text-sm font-bold text-gray-800 dark:text-gray-200">{txt.selectedEngines}</div>
             <div className={`text-xs text-${themeColor}-600 dark:text-${themeColor}-400`}>
               {selectedModels.length > 0 
-                ? `${selectedModels.length} Model${selectedModels.length > 1 ? 's' : ''} Selected` 
-                : 'Select Models'}
+                ? txt.modelCount(selectedModels.length)
+                : txt.selectModels}
             </div>
           </div>
         </div>
@@ -149,7 +232,7 @@ const ModelDropdown: React.FC<{
 
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#0c0c0e] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
-          {MODELS_LIST.map((model) => {
+          {modelsList.map((model) => {
             const isSelected = selectedModels.includes(model.id);
             return (
               <button
@@ -173,7 +256,7 @@ const ModelDropdown: React.FC<{
             );
           })}
           <div className="p-2 bg-gray-50 dark:bg-black/40 text-[10px] text-gray-500 text-center border-t border-gray-100 dark:border-white/5">
-             MAXIMUM 3 MODELS SIMULTANEOUSLY
+             {txt.maxModels}
           </div>
         </div>
       )}
@@ -184,21 +267,39 @@ const ModelDropdown: React.FC<{
 const ThemeToggle: React.FC<{ isDarkMode: boolean, toggle: () => void }> = ({ isDarkMode, toggle }) => (
   <button 
     onClick={toggle}
-    className="fixed bottom-6 left-6 z-50 p-2 rounded-full glass-panel hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition-colors shadow-lg"
+    className="p-2 rounded-full glass-panel hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition-colors shadow-lg"
     title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
   >
     {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
   </button>
 );
 
+const LanguageToggle: React.FC<{ lang: 'en' | 'zh', toggle: () => void }> = ({ lang, toggle }) => (
+  <button 
+    onClick={toggle}
+    className="p-2 rounded-full glass-panel hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition-colors shadow-lg flex items-center justify-center gap-1 font-mono text-xs font-bold w-10 h-10"
+    title="Switch Language"
+  >
+    {lang === 'en' ? 'EN' : 'ZH'}
+  </button>
+);
+
+// --- Main App Component ---
+
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.LANDING);
   const [context, setContext] = useState<UserContext>({
-    models: [ModelProvider.GEMINI_FLASH]
+    models: [ModelProvider.GEMINI_FLASH],
+    language: 'en'
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  const activeTheme = context.field ? FIELD_CONFIG[context.field] : FIELD_CONFIG[ResearchField.GENERAL];
+  // Dynamic Configs based on Language
+  const fieldConfig = useMemo(() => getFieldConfig(context.language), [context.language]);
+  const modelsList = useMemo(() => getModelsList(context.language), [context.language]);
+  const txt = APP_TEXT[context.language];
+
+  const activeTheme = context.field ? fieldConfig[context.field] : fieldConfig[ResearchField.GENERAL];
 
   const toggleModel = (modelId: ModelProvider) => {
     setContext(prev => {
@@ -213,6 +314,10 @@ const App: React.FC = () => {
     });
   };
 
+  const toggleLanguage = () => {
+      setContext(prev => ({ ...prev, language: prev.language === 'en' ? 'zh' : 'en' }));
+  };
+
   // --- Views ---
 
   const LandingView = () => (
@@ -221,34 +326,34 @@ const App: React.FC = () => {
         <BrainCircuit className="w-12 h-12 text-blue-600 dark:text-blue-400" />
       </div>
       <h1 className="text-6xl md:text-8xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-gray-800 to-blue-600 dark:from-blue-200 dark:via-white dark:to-blue-200 text-center tracking-tighter mb-6 font-mono drop-shadow-sm">
-        ProtoChat
+        {txt.landingTitle}
       </h1>
       <p className="text-gray-600 dark:text-gray-400 text-lg md:text-xl max-w-2xl text-center mb-12 font-light">
-        The ultimate research companion. Exploring the intersection of mathematical beauty and artificial intelligence.
+        {txt.landingSubtitle}
       </p>
       <button 
         onClick={() => setView(AppView.FIELD_SELECT)}
         className="group relative px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-black font-bold text-lg rounded-full hover:bg-gray-800 dark:hover:bg-blue-50 transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-xl"
       >
-        <span className="relative z-10">Initialize Research</span>
+        <span className="relative z-10">{txt.initResearch}</span>
         <ChevronRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
         <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-emerald-400 opacity-0 group-hover:opacity-20 transition-opacity"></div>
       </button>
 
       <div className="absolute bottom-8 text-xs text-gray-500 dark:text-gray-600 font-mono">
-        Powered by Gemini • Three.js • React
+        {txt.footer}
       </div>
     </div>
   );
 
   const FieldSelectView = () => (
     <div className="h-screen flex flex-col items-center justify-center z-10 relative p-8">
-      <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Select Research Discipline</h2>
-      <p className="text-gray-600 dark:text-gray-400 mb-10">Define the broad academic context for the AI model.</p>
+      <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{txt.selectFieldTitle}</h2>
+      <p className="text-gray-600 dark:text-gray-400 mb-10">{txt.selectFieldSubtitle}</p>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl w-full">
-        {(Object.keys(FIELD_CONFIG) as ResearchField[]).map((fieldKey) => {
-          const config = FIELD_CONFIG[fieldKey];
+        {(Object.keys(fieldConfig) as ResearchField[]).map((fieldKey) => {
+          const config = fieldConfig[fieldKey];
           return (
             <button
               key={fieldKey}
@@ -262,14 +367,14 @@ const App: React.FC = () => {
                 <config.icon size={24} className={`text-gray-600 dark:text-gray-400 group-hover:text-${config.color}-600 dark:group-hover:text-${config.color}-400 transition-colors`} />
               </div>
               <div>
-                <h3 className={`text-lg font-semibold text-gray-800 dark:text-gray-200 group-hover:text-${config.color}-600 dark:group-hover:text-${config.color}-400 transition-colors`}>{fieldKey}</h3>
+                <h3 className={`text-lg font-semibold text-gray-800 dark:text-gray-200 group-hover:text-${config.color}-600 dark:group-hover:text-${config.color}-400 transition-colors`}>{config.label}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-500 mt-1">{config.description}</p>
               </div>
             </button>
           );
         })}
       </div>
-      <button onClick={() => setView(AppView.LANDING)} className="mt-12 text-gray-500 hover:text-gray-900 dark:hover:text-white text-sm">Cancel</button>
+      <button onClick={() => setView(AppView.LANDING)} className="mt-12 text-gray-500 hover:text-gray-900 dark:hover:text-white text-sm">{txt.cancel}</button>
     </div>
   );
 
@@ -278,15 +383,15 @@ const App: React.FC = () => {
       <div className="max-w-5xl w-full">
         <div className="flex items-center gap-3 mb-2">
             <activeTheme.icon className={`text-${activeTheme.color}-600 dark:text-${activeTheme.color}-400`} size={28} />
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{context.field} Workspace</h2>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{activeTheme.label} {txt.workspaceTitle}</h2>
         </div>
-        <p className="text-gray-600 dark:text-gray-400 mb-8">Select a specialized research tool for this domain.</p>
+        <p className="text-gray-600 dark:text-gray-400 mb-8">{txt.selectToolSubtitle}</p>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Tasks Column */}
           <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-4">Research Tools</h3>
+            <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-4">{txt.toolsTitle}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {activeTheme.tasks.map((task) => (
                 <button
@@ -307,21 +412,22 @@ const App: React.FC = () => {
           {/* Models Column */}
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-4">
-               <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold">Engine Cluster</h3>
-               <span className="text-xs text-gray-500">Select up to 3 for comparison</span>
+               <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold">{txt.engineClusterTitle}</h3>
+               <span className="text-xs text-gray-500">{txt.engineClusterSubtitle}</span>
             </div>
             
-            {/* Model Dropdown Implementation */}
             <ModelDropdown 
               selectedModels={context.models} 
               onToggle={toggleModel} 
-              themeColor={activeTheme.color} 
+              themeColor={activeTheme.color}
+              lang={context.language}
+              modelsList={modelsList}
             />
 
             {/* Selected Chips Preview */}
             <div className="mt-4 flex flex-col gap-2">
               {context.models.map(mId => {
-                const model = MODELS_LIST.find(m => m.id === mId);
+                const model = modelsList.find(m => m.id === mId);
                 return (
                   <div key={mId} className="flex items-center gap-2 p-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                     <div className={`w-2 h-2 rounded-full bg-${activeTheme.color}-500 shadow shadow-${activeTheme.color}-500/50`}></div>
@@ -334,13 +440,13 @@ const App: React.FC = () => {
         </div>
 
         <div className="mt-12 flex justify-between items-center border-t border-gray-200 dark:border-white/10 pt-8">
-          <button onClick={() => setView(AppView.FIELD_SELECT)} className="text-gray-500 hover:text-gray-900 dark:hover:text-white">← Back</button>
+          <button onClick={() => setView(AppView.FIELD_SELECT)} className="text-gray-500 hover:text-gray-900 dark:hover:text-white">{txt.back}</button>
           <button 
             disabled={!context.task}
             onClick={() => setView(AppView.WORKSPACE)}
             className={`px-8 py-3 bg-${activeTheme.color}-600 hover:bg-${activeTheme.color}-500 disabled:bg-gray-300 disabled:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-500 text-white font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg`}
           >
-            Launch Workspace <ChevronRight size={18} />
+            {txt.launch} <ChevronRight size={18} />
           </button>
         </div>
       </div>
@@ -352,8 +458,11 @@ const App: React.FC = () => {
       <div className="relative min-h-screen text-gray-900 dark:text-gray-100 font-sans selection:bg-blue-500/30 bg-gray-50 dark:bg-black transition-colors duration-500">
         <ParticleBackground field={context.field} isDarkMode={isDarkMode} />
         
-        {/* Global Theme Toggle */}
-        <ThemeToggle isDarkMode={isDarkMode} toggle={() => setIsDarkMode(!isDarkMode)} />
+        {/* Global Controls */}
+        <div className="fixed bottom-6 left-6 z-50 flex flex-col gap-2">
+           <ThemeToggle isDarkMode={isDarkMode} toggle={() => setIsDarkMode(!isDarkMode)} />
+           <LanguageToggle lang={context.language} toggle={toggleLanguage} />
+        </div>
 
         {/* View Router */}
         {view === AppView.LANDING && <LandingView />}
@@ -365,6 +474,7 @@ const App: React.FC = () => {
             themeColor={activeTheme.color}
             isDarkMode={isDarkMode}
             onBack={() => setView(AppView.TASK_SELECT)} 
+            onToggleLanguage={toggleLanguage}
           />
         )}
       </div>

@@ -4,7 +4,7 @@ import { GoogleGenAI, GenerateContentResponse, FunctionDeclaration, Type } from 
 import { ResearchField, ResearchTask, ModelProvider, AgentConfig, MCPPlugin } from "../types";
 
 // Helper to get detailed system instructions
-export const getSystemInstruction = (field: ResearchField, task: ResearchTask): string => {
+export const getSystemInstruction = (field: ResearchField, task: ResearchTask, language: 'en' | 'zh' = 'en'): string => {
   const baseIdentity = `You are ProtoChat, a world-class research assistant specialized in **${field}**. 
   Your demeanor is professional, academic, and rigorous. 
   You prioritize accuracy, citation of standard theories, and logical consistency.`;
@@ -86,6 +86,11 @@ export const getSystemInstruction = (field: ResearchField, task: ResearchTask): 
       4HHB
       \`\`\`
       Do NOT output the full PDB file content, only the 4-character ID.`;
+  }
+
+  // --- LANGUAGE INSTRUCTION ---
+  if (language === 'zh') {
+      specificInstruction += `\n\n**LANGUAGE REQUIREMENT**: You MUST interact and respond in **Chinese (Simplified)**. Keep technical terms in English where appropriate for academic precision, but the explanation must be in Chinese.`;
   }
 
   return `${baseIdentity}\n\n${specificInstruction}`;
@@ -271,15 +276,12 @@ const callGoogleGenAI = async (
                     onChunk(text);
                     fullText += text;
                 }
-                // Check for function calls in the chunk (Gemini SDK handles this on the full response usually, but for streaming we might get it in parts or final object)
-                // The @google/genai SDK v0.1.x exposes functionCalls on the chunk/response object
                 const calls = (chunk as any).functionCalls;
                 if (calls && calls.length > 0) {
                      functionCalls.push(...calls);
                 }
             }
 
-            // If we have function calls, execute them (Simulate MCP) and loop back
             if (functionCalls.length > 0) {
                 keepGoing = true;
                 const functionResponses = [];
@@ -290,13 +292,11 @@ const callGoogleGenAI = async (
                     functionResponses.push({
                         id: call.id,
                         name: call.name,
-                        response: { result: JSON.parse(mockResult) } // SDK expects object
+                        response: { result: JSON.parse(mockResult) } 
                     });
                 }
 
-                // Prepare next message with tool response
                 currentMessage = {
-                     // @ts-ignore - The SDK types might vary slightly, sending list of parts
                     message: functionResponses
                 } as any;
             }
@@ -388,13 +388,13 @@ export const streamResponse = async (
   history: { role: string; parts: { text: string }[] }[],
   prompt: string,
   files: File[],
-  context: { field: ResearchField; task: ResearchTask; config?: AgentConfig },
+  context: { field: ResearchField; task: ResearchTask; config?: AgentConfig; language: 'en' | 'zh' },
   modelId: ModelProvider,
   onChunk: (text: string) => void
 ): Promise<string> => {
   
   // 1. Prepare Configuration
-  const systemInstruction = context.config?.systemInstruction || getSystemInstruction(context.field, context.task);
+  const systemInstruction = context.config?.systemInstruction || getSystemInstruction(context.field, context.task, context.language);
   
   let config: any = {
     systemInstruction,
@@ -449,7 +449,6 @@ export const streamResponse = async (
   // 4. Route to Provider
   try {
     if (Object.values(ModelProvider).includes(modelId)) {
-        // Simple routing based on ID prefix or explicit enum check
         if (modelId.startsWith('gemini') || modelId.startsWith('learnlm')) {
             await callGoogleGenAI(cleanHistory, messageParts, config, modelId, onChunk);
         } else if (modelId.includes('gpt') || modelId.includes('o1')) {
@@ -461,11 +460,10 @@ export const streamResponse = async (
         } else if (modelId.includes('deepseek')) {
             await callDeepSeek(cleanHistory, messageParts, config, modelId, onChunk);
         } else {
-            // Default Fallback
             await callGoogleGenAI(cleanHistory, messageParts, config, ModelProvider.GEMINI_FLASH, onChunk);
         }
     }
-    return ""; // Stream handled via callback
+    return ""; 
   } catch (error) {
     console.error("Model Execution Error:", error);
     const errorMessage = `\n\n[System Error: Connection failed for ${modelId}. Check console for details.]`;

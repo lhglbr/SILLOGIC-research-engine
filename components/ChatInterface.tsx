@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -14,7 +15,62 @@ interface ChatInterfaceProps {
   themeColor: string;
   isDarkMode: boolean;
   onBack: () => void;
+  onToggleLanguage: () => void;
 }
+
+// --- Translations ---
+const TRANSLATIONS = {
+    en: {
+        activeCluster: "Select Engine",
+        splitView: "Split View Active",
+        singleSession: "Single Session",
+        export: "Export Conversation",
+        config: "Configuration",
+        settings: "Settings",
+        messagePlaceholder: "Message ProtoChat...",
+        askQuestion: "Ask a research question... (Ctrl + Enter to send)",
+        send: "Send",
+        thinking: "Reasoning Chain",
+        complete: "Complete",
+        preview: "Preview",
+        viewArtifact: "View Generated Artifact",
+        fork: "Fork",
+        systemTemp: "System Temperature",
+        topP: "Top P (Nucleus)",
+        mcpMarketplace: "MCP Marketplace",
+        installed: "INSTALLED",
+        get: "GET",
+        selectModels: "Select up to 3 Models",
+        ready: "Ready to research.",
+        selectEngine: "Select Engine",
+        chars: "chars"
+    },
+    zh: {
+        activeCluster: "选择模型引擎",
+        splitView: "分屏模式",
+        singleSession: "单会话模式",
+        export: "导出对话",
+        config: "系统配置",
+        settings: "设置",
+        messagePlaceholder: "发送给 ProtoChat...",
+        askQuestion: "输入研究问题... (Ctrl + Enter 发送)",
+        send: "发送",
+        thinking: "推理链",
+        complete: "完成",
+        preview: "预览",
+        viewArtifact: "查看生成的工件",
+        fork: "分叉",
+        systemTemp: "系统温度 (Temperature)",
+        topP: "核采样 (Top P)",
+        mcpMarketplace: "MCP 插件市场",
+        installed: "已安装",
+        get: "获取",
+        selectModels: "最多选择 3 个模型",
+        ready: "准备开始研究。",
+        selectEngine: "选择引擎",
+        chars: "字符"
+    }
+};
 
 // --- Constants ---
 
@@ -48,7 +104,7 @@ const MOCK_MCP_PLUGINS: MCPPlugin[] = [
 // --- Sub-Components ---
 
 // 1. Thinking Process Visualization (CoT)
-const ThinkingProcess: React.FC<{ content: string, isDone: boolean }> = ({ content, isDone }) => {
+const ThinkingProcess: React.FC<{ content: string, isDone: boolean, t: any }> = ({ content, isDone, t }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -66,7 +122,7 @@ const ThinkingProcess: React.FC<{ content: string, isDone: boolean }> = ({ conte
       >
         <div className="flex items-center gap-2">
             <BrainCircuit size={14} className={isDone ? "text-gray-500" : "text-blue-500 animate-pulse"} />
-            <span>Reasoning Chain {isDone ? "(Complete)" : "(Thinking...)"}</span>
+            <span>{t.thinking} {isDone ? `(${t.complete})` : "..."}</span>
         </div>
         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
@@ -81,7 +137,7 @@ const ThinkingProcess: React.FC<{ content: string, isDone: boolean }> = ({ conte
 };
 
 // 2. Artifact Renderer (Right Panel)
-const ArtifactRenderer: React.FC<{ content: string, type: 'svg' | 'html' | 'react' | 'pdb' | 'mermaid', onClose: () => void }> = ({ content, type, onClose }) => {
+const ArtifactRenderer: React.FC<{ content: string, type: 'svg' | 'html' | 'react' | 'pdb' | 'mermaid', onClose: () => void, t: any }> = ({ content, type, onClose, t }) => {
     const [scale, setScale] = useState(1);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -126,7 +182,7 @@ const ArtifactRenderer: React.FC<{ content: string, type: 'svg' | 'html' | 'reac
             <div className="flex items-center justify-between p-4 border-b dark:border-white/10 border-gray-200 dark:bg-white/5 bg-gray-50">
                 <div className="flex items-center gap-2 text-sm font-bold dark:text-gray-200 text-gray-800 uppercase tracking-wider">
                     {type === 'pdb' ? <Dna size={16} className="text-emerald-500"/> : <Code size={16} className="text-blue-500"/>}
-                    {type.toUpperCase()} Preview
+                    {type.toUpperCase()} {t.preview}
                 </div>
                 <div className="flex items-center gap-2">
                     {type === 'svg' && (
@@ -172,8 +228,9 @@ const MessageBubble: React.FC<{
     msg: ChatMessage, 
     themeColor: string, 
     onFork?: (msgId: string) => void,
-    onViewArtifact: (content: string, type: any) => void 
-}> = ({ msg, themeColor, onFork, onViewArtifact }) => {
+    onViewArtifact: (content: string, type: any) => void,
+    t: any
+}> = ({ msg, themeColor, onFork, onViewArtifact, t }) => {
   const isUser = msg.role === 'user';
   
   const detectArtifact = (text: string) => {
@@ -199,7 +256,7 @@ const MessageBubble: React.FC<{
       return (
         <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed">
             {thinkContent && (
-                <ThinkingProcess content={thinkContent} isDone={!isThinking} />
+                <ThinkingProcess content={thinkContent} isDone={!isThinking} t={t} />
             )}
             
             <ReactMarkdown 
@@ -217,7 +274,7 @@ const MessageBubble: React.FC<{
                                    onClick={() => onViewArtifact(String(children).replace(/\n$/, ''), match![1])}
                                    className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-${themeColor}-100 dark:bg-${themeColor}-600/20 text-${themeColor}-600 dark:text-${themeColor}-400 text-xs rounded border border-${themeColor}-200 dark:border-${themeColor}-500/30 hover:bg-${themeColor}-200 dark:hover:bg-${themeColor}-600/40 transition-colors`}
                                  >
-                                    <Maximize2 size={12}/> Preview
+                                    <Maximize2 size={12}/> {t.preview}
                                  </button>
                              )}
                              <pre className={className} {...props}><code>{children}</code></pre>
@@ -235,7 +292,7 @@ const MessageBubble: React.FC<{
                     className={`mt-4 w-full py-2 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg flex items-center justify-center gap-2 text-${themeColor}-600 dark:text-${themeColor}-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors`}
                  >
                     {artifact.type === 'pdb' ? <Dna size={16}/> : <Layout size={16}/>}
-                    View Generated {artifact.type.toUpperCase()} Artifact
+                    {t.viewArtifact} ({artifact.type.toUpperCase()})
                  </button>
             )}
         </div>
@@ -271,7 +328,7 @@ const MessageBubble: React.FC<{
                     onClick={() => onFork(msg.id)}
                     className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded-full"
                 >
-                    <GitBranch size={10}/> Fork
+                    <GitBranch size={10}/> {t.fork}
                 </button>
             )}
          </div>
@@ -302,8 +359,9 @@ const MessageBubble: React.FC<{
 const ChatModelDropdown: React.FC<{
   activeModels: ModelProvider[],
   setActiveModels: (models: ModelProvider[]) => void,
-  themeColor: string
-}> = ({ activeModels, setActiveModels, themeColor }) => {
+  themeColor: string,
+  t: any
+}> = ({ activeModels, setActiveModels, themeColor, t }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -326,7 +384,7 @@ const ChatModelDropdown: React.FC<{
   };
 
   const getButtonLabel = () => {
-    if (activeModels.length === 0) return "Select Engine";
+    if (activeModels.length === 0) return t.selectEngine;
     const names = activeModels.map(id => {
         const m = AVAILABLE_MODELS.find(mod => mod.id === id);
         if (!m) return "";
@@ -357,7 +415,7 @@ const ChatModelDropdown: React.FC<{
       {isOpen && (
         <div className="absolute bottom-full mb-2 left-0 w-64 bg-white dark:bg-[#0f0f11] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden max-h-64 overflow-y-auto">
           <div className="p-2 border-b border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5">
-              <span className="text-[10px] text-gray-500 font-bold uppercase">Select up to 3 Models</span>
+              <span className="text-[10px] text-gray-500 font-bold uppercase">{t.selectModels}</span>
           </div>
           {AVAILABLE_MODELS.map((model) => {
             const isSelected = activeModels.includes(model.id);
@@ -443,7 +501,8 @@ const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext
                     {
                         field: context.field || ResearchField.GENERAL,
                         task: context.task || ResearchTask.DEEP_SEARCH,
-                        config: context.config
+                        config: context.config,
+                        language: context.language
                     },
                     modelId,
                     (chunk) => {
@@ -488,13 +547,15 @@ const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext
 
 // --- Main Component ---
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDarkMode, onBack }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDarkMode, onBack, onToggleLanguage }) => {
   const [panes, setPanes] = useState<number[]>([1]); 
   const [activePaneIdx, setActivePaneIdx] = useState(0);
   
   const [artifact, setArtifact] = useState<{content: string, type: 'svg'|'html'|'react'|'pdb'|'mermaid'}|null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(context.config || { temperature: 0.7, topP: 0.95, mcpPlugins: [] });
+
+  const t = context.language === 'zh' ? TRANSLATIONS.zh : TRANSLATIONS.en;
 
   const bottomRef = useRef<HTMLDivElement>(null);
   
@@ -572,23 +633,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                         ProtoChat <span className="text-gray-400">/</span> {context.field}
                     </h1>
                     <div className="flex items-center gap-2 text-[10px] text-gray-500 uppercase tracking-wider">
-                         <span>{isSplit ? "Split View Active" : "Single Session"}</span>
+                         <span>{isSplit ? t.splitView : t.singleSession}</span>
                     </div>
                 </div>
             </div>
             
             <div className="flex items-center gap-2">
+                <button 
+                  onClick={onToggleLanguage}
+                  className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1 font-mono text-xs"
+                  title="Switch Language"
+                >
+                    <Globe size={18}/> {context.language === 'en' ? 'EN' : 'ZH'}
+                </button>
+                <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-2" />
                 <button onClick={() => isSplit ? setPanes([1]) : null} className={`p-2 rounded-lg ${!isSplit ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
                     <MessageSquare size={18}/>
                 </button>
                 <button onClick={() => !isSplit && session1.history.length > 0 ? setPanes([1,2]) : null} className={`p-2 rounded-lg ${isSplit ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
                     <Columns size={18}/>
                 </button>
-                <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-2" />
-                <button onClick={() => handleExport(activeSession.history)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white" title="Export Conversation">
+                <button onClick={() => handleExport(activeSession.history)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white" title={t.export}>
                     <Download size={18}/>
                 </button>
-                <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white" title={t.settings}>
                     <Settings size={18}/>
                 </button>
             </div>
@@ -611,7 +679,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                             {session.history.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center opacity-30 pointer-events-none">
                                     <BrainCircuit size={64} className={`text-${themeColor}-500 mb-4`} />
-                                    <p className="text-lg font-mono text-gray-400 dark:text-gray-500">Ready to research.</p>
+                                    <p className="text-lg font-mono text-gray-400 dark:text-gray-500">{t.ready}</p>
                                 </div>
                             ) : (
                                 session.history.map(msg => (
@@ -621,6 +689,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                                         themeColor={themeColor} 
                                         onFork={(msgId) => handleFork(msgId, paneId)}
                                         onViewArtifact={(c, t) => setArtifact({content: c, type: t})}
+                                        t={t}
                                     />
                                 ))
                             )}
@@ -638,9 +707,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                     activeModels={activeSession.activeModels} 
                     setActiveModels={activeSession.setActiveModels} 
                     themeColor={themeColor}
+                    t={t}
                  />
                  <span className="text-[10px] text-gray-400 dark:text-gray-600 font-mono">
-                     {activeSession.input.length} chars
+                     {activeSession.input.length} {t.chars}
                  </span>
              </div>
 
@@ -680,7 +750,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                                 activeSession.handleSubmit(e);
                             }
                         }}
-                        placeholder={`Message ${isSplit ? (activePaneIdx === 0 ? "Left Pane" : "Right Pane") : "ProtoChat"}... (Ctrl + Enter to send)`}
+                        placeholder={isSplit ? (activePaneIdx === 0 ? "Message Left Pane..." : "Message Right Pane...") : t.askQuestion}
                         className="w-full bg-transparent text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 font-mono text-sm resize-none py-3 focus:outline-none min-h-[40px] max-h-32"
                         rows={1}
                     />
@@ -701,7 +771,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
       {/* RIGHT: Artifact Panel */}
       {artifact && (
           <div className="absolute inset-y-0 right-0 w-[400px] z-40 shadow-2xl animate-in slide-in-from-right duration-300">
-              <ArtifactRenderer content={artifact.content} type={artifact.type} onClose={() => setArtifact(null)} />
+              <ArtifactRenderer content={artifact.content} type={artifact.type} onClose={() => setArtifact(null)} t={t} />
           </div>
       )}
 
@@ -709,7 +779,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
       {isSettingsOpen && (
           <div className="absolute inset-y-0 right-0 w-80 bg-white dark:bg-[#0f0f11] border-l border-gray-200 dark:border-white/10 z-50 p-6 flex flex-col shadow-2xl animate-in slide-in-from-right">
               <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Sliders size={18}/> Configuration</h2>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Sliders size={18}/> {t.config}</h2>
                   <button onClick={() => setIsSettingsOpen(false)}><X size={18} className="text-gray-400 hover:text-gray-900 dark:hover:text-white"/></button>
               </div>
 
@@ -717,7 +787,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
               <div className="space-y-6 overflow-y-auto flex-1 scrollbar-hide">
                   
                   <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase block mb-2">System Temperature</label>
+                      <label className="text-xs font-bold text-gray-500 uppercase block mb-2">{t.systemTemp}</label>
                       <div className="flex items-center gap-3">
                           <input 
                             type="range" min="0" max="2" step="0.1" 
@@ -730,7 +800,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                   </div>
 
                   <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Top P (Nucleus)</label>
+                      <label className="text-xs font-bold text-gray-500 uppercase block mb-2">{t.topP}</label>
                       <div className="flex items-center gap-3">
                           <input 
                             type="range" min="0" max="1" step="0.05" 
@@ -744,7 +814,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
 
                   <div className="border-t border-gray-200 dark:border-white/10 pt-4">
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-3 flex items-center gap-2">
-                          <Plug size={14}/> MCP Marketplace
+                          <Plug size={14}/> {t.mcpMarketplace}
                       </label>
                       <div className="space-y-2">
                           {MOCK_MCP_PLUGINS.map(plugin => {
@@ -766,7 +836,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                                         }}
                                         className={`px-2 py-1 rounded text-[10px] font-bold ${isInstalled ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-blue-600 text-white'}`}
                                       >
-                                          {isInstalled ? 'INSTALLED' : 'GET'}
+                                          {isInstalled ? t.installed : t.get}
                                       </button>
                                   </div>
                               )

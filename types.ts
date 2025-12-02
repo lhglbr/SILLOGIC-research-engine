@@ -92,4 +92,5 @@ export interface UserContext {
   task?: ResearchTask;
   models: ModelProvider[];
   config?: AgentConfig;
+  language: 'en' | 'zh';
 }

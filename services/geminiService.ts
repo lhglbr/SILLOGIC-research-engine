@@ -1,5 +1,6 @@
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { ResearchField, ResearchTask, ModelProvider, AgentConfig } from "../types";
+
+import { GoogleGenAI, GenerateContentResponse, FunctionDeclaration, Type } from "@google/genai";
+import { ResearchField, ResearchTask, ModelProvider, AgentConfig, MCPPlugin } from "../types";
 
 // Helper to get detailed system instructions
 export const getSystemInstruction = (field: ResearchField, task: ResearchTask): string => {
@@ -63,6 +64,15 @@ export const getSystemInstruction = (field: ResearchField, task: ResearchTask): 
 
     default:
       specificInstruction = "Provide high-quality academic assistance.";
+  }
+
+  // --- SPECIALIZED ARTIFACT INSTRUCTIONS ---
+  if (field === ResearchField.LIFE) {
+      specificInstruction += `\n\n**PROTEIN VISUALIZATION**: If the user asks to see a protein structure (e.g., "Show me Hemoglobin"), you MUST find the corresponding PDB ID (e.g., "4HHB") and output it in a 'pdb' code block like this:
+      \`\`\`pdb
+      4HHB
+      \`\`\`
+      Do NOT output the full PDB file content, only the 4-character ID.`;
   }
 
   return `${baseIdentity}\n\n${specificInstruction}`;
@@ -138,7 +148,56 @@ const simulateExternalModel = async (
 };
 
 /**
- * PROVIDER IMPLEMENTATION: GOOGLE GEMINI
+ * MCP BRIDGE: MOCK EXECUTION
+ * Since we are in a browser and cannot truly connect to local stdio/databases,
+ * we simulate the execution of popular MCP tools.
+ */
+const executeMockMCPTool = (toolName: string, args: any): string => {
+    console.log(`[MCP Bridge] Executing ${toolName}`, args);
+
+    switch (toolName) {
+        // Filesystem Plugin
+        case 'fs_list_directory':
+            return JSON.stringify({
+                files: [
+                    { name: 'research_data.csv', size: '12MB', type: 'file' },
+                    { name: 'methodology_draft.md', size: '45KB', type: 'file' },
+                    { name: 'experiments', type: 'directory' }
+                ],
+                path: args.path || './'
+            });
+        case 'fs_read_file':
+             return "Sample content of the requested file... [Simulated Data]";
+
+        // Postgres Plugin
+        case 'pg_query':
+            if (args.query.toLowerCase().includes('select')) {
+                return JSON.stringify({
+                    columns: ['id', 'experiment_name', 'p_value', 'status'],
+                    rows: [
+                        [1, 'Alpha Test', 0.04, 'Significant'],
+                        [2, 'Beta Test', 0.12, 'Inconclusive'],
+                        [3, 'Gamma Test', 0.001, 'Highly Significant']
+                    ]
+                });
+            }
+            return JSON.stringify({ status: 'success', rows_affected: 1 });
+
+        // GitHub Plugin
+        case 'github_list_issues':
+            return JSON.stringify([
+                { id: 101, title: 'Fix chart rendering bug', status: 'open' },
+                { id: 102, title: 'Update dependencies', status: 'closed' }
+            ]);
+
+        default:
+            return JSON.stringify({ error: `Tool ${toolName} simulation not implemented.` });
+    }
+}
+
+
+/**
+ * PROVIDER IMPLEMENTATION: GOOGLE GEMINI (With MCP Support)
  */
 const callGoogleGenAI = async (
     history: any[],
@@ -153,8 +212,7 @@ const callGoogleGenAI = async (
     switch (modelId) {
         case ModelProvider.GEMINI_THINKING:
             modelName = 'gemini-3-pro-preview';
-            // Force Thinking behavior simulation via prompt if native budget isn't enough/supported in preview
-            config.systemInstruction += "\n\nIMPORTANT: You are a Thinking Model. You MUST output your internal reasoning process enclosed in <think>...</think> tags before providing the final answer. Show your step-by-step logic.";
+            config.systemInstruction += "\n\nIMPORTANT: You are a Thinking Model. You MUST output your internal reasoning process enclosed in <think>...</think> tags before providing the final answer.";
             break;
         case ModelProvider.GEMINI_PRO:
             modelName = 'gemini-3-pro-preview';
@@ -182,10 +240,53 @@ const callGoogleGenAI = async (
             config: config,
             history: history
         });
-        const result = await chat.sendMessageStream({ message: messageParts });
-        for await (const chunk of result) {
-            const text = (chunk as GenerateContentResponse).text;
-            if(text) onChunk(text);
+
+        // Loop to handle tool calls (Multi-turn tool execution)
+        let keepGoing = true;
+        let currentMessage = { message: messageParts };
+
+        while (keepGoing) {
+            keepGoing = false;
+            const result = await chat.sendMessageStream(currentMessage);
+            
+            let fullText = "";
+            let functionCalls: any[] = [];
+
+            for await (const chunk of result) {
+                const text = (chunk as GenerateContentResponse).text;
+                if (text) {
+                    onChunk(text);
+                    fullText += text;
+                }
+                // Check for function calls in the chunk (Gemini SDK handles this on the full response usually, but for streaming we might get it in parts or final object)
+                // The @google/genai SDK v0.1.x exposes functionCalls on the chunk/response object
+                const calls = (chunk as any).functionCalls;
+                if (calls && calls.length > 0) {
+                     functionCalls.push(...calls);
+                }
+            }
+
+            // If we have function calls, execute them (Simulate MCP) and loop back
+            if (functionCalls.length > 0) {
+                keepGoing = true;
+                const functionResponses = [];
+                
+                for (const call of functionCalls) {
+                    onChunk(`\n\n> 🔌 **MCP Protocol Active**: Executing tool \`${call.name}\`...\n\n`);
+                    const mockResult = executeMockMCPTool(call.name, call.args);
+                    functionResponses.push({
+                        id: call.id,
+                        name: call.name,
+                        response: { result: JSON.parse(mockResult) } // SDK expects object
+                    });
+                }
+
+                // Prepare next message with tool response
+                currentMessage = {
+                     // @ts-ignore - The SDK types might vary slightly, sending list of parts
+                    message: functionResponses
+                } as any;
+            }
         }
     } catch (error) {
         throw error;
@@ -289,9 +390,30 @@ export const streamResponse = async (
     maxOutputTokens: context.config?.maxOutputTokens ?? 8192,
   };
 
-  // Tool Configuration (Applies mostly to Google models, others handle tools differently)
+  // Tool Configuration
+  const tools: any[] = [];
+
+  // Native Search
   if (context.config?.enableSearch) {
-    config.tools = [{ googleSearch: {} }];
+    tools.push({ googleSearch: {} });
+  }
+
+  // MCP Plugins
+  if (context.config?.mcpPlugins && context.config.mcpPlugins.length > 0) {
+      const mcpFunctions = context.config.mcpPlugins.flatMap(plugin => 
+          plugin.tools.map(tool => ({
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.parameters
+          }))
+      );
+      if (mcpFunctions.length > 0) {
+          tools.push({ functionDeclarations: mcpFunctions });
+      }
+  }
+
+  if (tools.length > 0) {
+      config.tools = tools;
   }
 
   // 2. Prepare Payload

@@ -29,8 +29,8 @@ export enum ModelProvider {
   GEMINI_FLASH_LITE = 'gemini-2.5-flash-lite',
   GEMINI_PRO = 'gemini-3-pro-preview',
   GEMINI_THINKING = 'gemini-3-pro-preview-thinking',
-  GEMINI_EXP = 'gemini-exp-1206',
-  LEARN_LM = 'learnlm-1.5-pro-experimental',
+  GEMINI_EXP = 'gemini-2.5-flash',
+  LEARN_LM = 'gemini-3-pro-preview',
   
   // External (Simulated via Persona for Demo)
   OPENAI_GPT4O = 'gpt-4o',
@@ -58,12 +58,31 @@ export interface ChatMessage {
   multiResponses?: MultiModelResponse[];
 }
 
+// --- MCP Definitions ---
+export interface MCPTool {
+  name: string;
+  description: string;
+  parameters: any; // JSON Schema
+}
+
+export interface MCPPlugin {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  icon: any; // Lucide Icon component
+  version: string;
+  tools: MCPTool[];
+  isInstalled?: boolean;
+}
+
 export interface AgentConfig {
   systemInstruction?: string;
   enableSearch?: boolean;
   temperature?: number;
   topP?: number;
   maxOutputTokens?: number;
+  mcpPlugins?: MCPPlugin[]; // Installed MCP plugins
 }
 
 export interface UserContext {

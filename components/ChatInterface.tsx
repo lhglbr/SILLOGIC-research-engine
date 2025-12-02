@@ -1,12 +1,14 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose } from 'lucide-react';
+import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
-import { ChatMessage, UserContext, ModelProvider, AgentConfig } from '../types';
+import { ChatMessage, UserContext, ModelProvider, AgentConfig, MCPPlugin, MCPTool } from '../types';
 import { streamResponse, getSystemInstruction } from '../services/geminiService';
+import { Type } from '@google/genai';
 
 interface ChatInterfaceProps {
   context: UserContext;
@@ -45,10 +47,65 @@ const AVAILABLE_MODELS = [
   { id: ModelProvider.DEEPSEEK_R1, name: "DeepSeek R1", desc: "DeepSeek • Math" },
 ];
 
+// --- MCP REGISTRY (MOCKED) ---
+const MCP_REGISTRY: MCPPlugin[] = [
+    {
+        id: 'filesystem',
+        name: 'Filesystem Explorer',
+        description: 'Read and list local files in allowed directories.',
+        author: 'Model Labs',
+        version: '1.0.2',
+        icon: HardDrive,
+        tools: [
+            {
+                name: 'fs_list_directory',
+                description: 'List files in a directory',
+                parameters: { type: Type.OBJECT, properties: { path: { type: Type.STRING } }, required: ['path'] }
+            },
+            {
+                name: 'fs_read_file',
+                description: 'Read contents of a file',
+                parameters: { type: Type.OBJECT, properties: { path: { type: Type.STRING } }, required: ['path'] }
+            }
+        ]
+    },
+    {
+        id: 'postgres',
+        name: 'PostgreSQL Connector',
+        description: 'Query local or remote PostgreSQL databases.',
+        author: 'DB Corp',
+        version: '0.9.5',
+        icon: Database,
+        tools: [
+            {
+                name: 'pg_query',
+                description: 'Execute a read-only SQL query',
+                parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING } }, required: ['query'] }
+            }
+        ]
+    },
+    {
+        id: 'github',
+        name: 'GitHub Agent',
+        description: 'Search repos, list issues, and view code.',
+        author: 'Open Source',
+        version: '2.1.0',
+        icon: Github,
+        tools: [
+             {
+                name: 'github_list_issues',
+                description: 'List issues for a repository',
+                parameters: { type: Type.OBJECT, properties: { repo: { type: Type.STRING } }, required: ['repo'] }
+            }
+        ]
+    }
+];
+
+
 // --- Artifact System ---
 interface ArtifactData {
     id: string;
-    type: 'html' | 'svg' | 'react' | 'mermaid';
+    type: 'html' | 'svg' | 'react' | 'mermaid' | 'pdb';
     content: string;
     title: string;
 }
@@ -59,9 +116,56 @@ const extractArtifact = (content: string): ArtifactData | null => {
 
     const svgMatch = content.match(/```svg([\s\S]*?)```/);
     if (svgMatch) return { id: Date.now().toString(), type: 'svg', content: svgMatch[1], title: 'Vector Graphic' };
+    
+    // PDB Match: ```pdb 1CRN ```
+    const pdbMatch = content.match(/```pdb\n?([\s\S]*?)```/);
+    if (pdbMatch) return { id: Date.now().toString(), type: 'pdb', content: pdbMatch[1].trim(), title: `Protein Structure (${pdbMatch[1].trim()})` };
 
     return null;
 }
+
+// --- Protein Viewer using 3Dmol.js ---
+const ProteinRenderer: React.FC<{ pdbId: string }> = ({ pdbId }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        
+        // Use the global $3Dmol object
+        // @ts-ignore
+        if (typeof $3Dmol === 'undefined') {
+            if (containerRef.current) containerRef.current.innerHTML = "3Dmol library not loaded.";
+            return;
+        }
+
+        const initViewer = async () => {
+             // @ts-ignore
+            const element = containerRef.current;
+            // @ts-ignore
+            const viewer = $3Dmol.createViewer(element, { backgroundColor: 'black' });
+            
+            try {
+                // Fetch PDB data from RCSB
+                const response = await fetch(`https://files.rcsb.org/download/${pdbId}.pdb`);
+                if (!response.ok) throw new Error("Failed to fetch PDB");
+                const pdbData = await response.text();
+
+                viewer.addModel(pdbData, "pdb");
+                viewer.setStyle({}, { cartoon: { color: 'spectrum' } });
+                viewer.zoomTo();
+                viewer.render();
+                viewer.animate({ loop: "backAndForth" });
+            } catch (e) {
+                console.error("PDB Error", e);
+                element.innerHTML = `<div style="padding:20px; color:red">Failed to load PDB: ${pdbId}</div>`;
+            }
+        };
+
+        initViewer();
+    }, [pdbId]);
+
+    return <div ref={containerRef} className="w-full h-full relative" />;
+};
 
 const ArtifactRenderer: React.FC<{ artifact: ArtifactData; themeColor: string }> = ({ artifact, themeColor }) => {
     if (artifact.type === 'svg') {
@@ -84,6 +188,11 @@ const ArtifactRenderer: React.FC<{ artifact: ArtifactData; themeColor: string }>
             </div>
         );
     }
+    
+    if (artifact.type === 'pdb') {
+        return <ProteinRenderer pdbId={artifact.content} />;
+    }
+
     return <div className="p-4 text-gray-400">Unsupported Artifact Type</div>;
 }
 
@@ -321,7 +430,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, themeColor, onCo
                                         {artifact && (
                                             <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <Code size={16} className="text-blue-400" />
+                                                    {artifact.type === 'pdb' ? <Dna size={16} className="text-emerald-400" /> : <Code size={16} className="text-blue-400" />}
                                                     <span className="text-xs text-blue-200 font-mono">Generated Artifact: {artifact.title}</span>
                                                 </div>
                                                 <button 
@@ -601,6 +710,11 @@ const ChatPane: React.FC<ChatPaneProps> = ({ session, themeColor, agentConfig, o
                             )}
                         </div>
                         {agentConfig.enableSearch && <div className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded bg-blue-900/30 border border-blue-500/30 text-[10px] text-blue-300"><Globe size={10} /> WEB CONNECTED</div>}
+                        {agentConfig.mcpPlugins && agentConfig.mcpPlugins.length > 0 && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-green-900/30 border border-green-500/30 text-[10px] text-green-300">
+                                <Plug size={10} /> MCP ACTIVE
+                            </div>
+                        )}
                     </div>
 
                     {/* File Previews */}
@@ -645,24 +759,35 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
   const [showArtifactPanel, setShowArtifactPanel] = useState(false);
   const [activeArtifact, setActiveArtifact] = useState<ArtifactData | null>(null);
 
-  // Global Config (shared across branches for simplicity, though independent state is better for forks, we start with global)
+  // Global Config
   const [agentConfig, setAgentConfig] = useState<AgentConfig>({
       enableSearch: false,
       systemInstruction: getSystemInstruction(context.field!, context.task!),
       temperature: 0.7,
-      topP: 0.95
+      topP: 0.95,
+      mcpPlugins: []
   });
+
+  const [availableMCPs] = useState<MCPPlugin[]>(MCP_REGISTRY);
+
+  const toggleMCPPlugin = (pluginId: string) => {
+      setAgentConfig(prev => {
+          const isInstalled = prev.mcpPlugins?.find(p => p.id === pluginId);
+          let newPlugins;
+          if (isInstalled) {
+              newPlugins = prev.mcpPlugins?.filter(p => p.id !== pluginId) || [];
+          } else {
+              const plugin = availableMCPs.find(p => p.id === pluginId);
+              newPlugins = plugin ? [...(prev.mcpPlugins || []), plugin] : prev.mcpPlugins;
+          }
+          return { ...prev, mcpPlugins: newPlugins };
+      });
+  };
 
   // Sessions
   const mainSession = useChatSession(context, [], themeColor);
-  const [forkSession, setForkSession] = useState<{ active: boolean; session: any } | null>(null);
-  
-  // Need to instantiate the fork session hooks conditionally or use a fixed one. 
-  // Hooks cannot be conditional. So we must initialize it but keep it "inactive" until needed.
-  // Actually, standard pattern is to have a list of sessions or just 2.
-  // Let's use a 2nd hook instance.
-  const secondarySession = useChatSession(context, [], themeColor);
   const [isSplit, setIsSplit] = useState(false);
+  const secondarySession = useChatSession(context, [], themeColor);
 
   // Initial Welcome Message for Main Session
   useEffect(() => {
@@ -675,7 +800,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
             multiResponses: [{
                 modelId: ModelProvider.GEMINI_FLASH,
                 modelName: "ProtoChat System",
-                content: `### ${context.field} Workspace Initialized\n\nI am ready to assist with **${context.task}** using **${mainSession.activeModels.map(getModelDisplayName).join(', ')}**.\n\n**New Features:**\n- **Vision:** Upload images for analysis.\n- **Artifacts:** Code & Preview (HTML/SVG).\n- **Branching:** Click <GitBranch size={12} className="inline text-gray-500"/> on any AI response to open a parallel fork.`,
+                content: `### ${context.field} Workspace Initialized\n\nI am ready to assist with **${context.task}** using **${mainSession.activeModels.map(getModelDisplayName).join(', ')}**.\n\n**New Features:**\n- **Vision:** Upload images for analysis.\n- **Artifacts:** Code & Preview (HTML/SVG).\n- **Protein:** View 3D structures (ask for PDBs).\n- **Branching:** Click <GitBranch size={12} className="inline text-gray-500"/> on any AI response to open a parallel fork.`,
                 isThinking: false,
                 isDone: true
             }]
@@ -684,9 +809,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
   }, []);
 
   const handleFork = (msgId: string) => {
-      // Logic: Find history up to that message in MAIN session (or whichever triggered it, but simplified to main for now)
-      // Actually, we should check which session triggered the fork. 
-      // For now, assume forking from Main -> Secondary.
       const idx = mainSession.messages.findIndex(m => m.id === msgId);
       if (idx !== -1) {
           const forkHistory = mainSession.messages.slice(0, idx + 1);
@@ -696,19 +818,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
       }
   };
   
-  // Also support forking from secondary -> main? No, usually simpler to just have one fork active.
-  // If user forks from Secondary, maybe overwrite Main? Or just ignore for MVP.
-  // Let's support forking from Main only for simplicity in this interaction.
-
   const handlePreviewArtifact = (artifact: ArtifactData) => {
       setActiveArtifact(artifact);
       setShowArtifactPanel(true);
   };
 
   const exportChat = () => {
-      // Export logic
-      const sessionToExport = isSplit ? secondarySession : mainSession;
-      // ... (Existing export logic implementation)
       alert("Exporting current active session...");
   };
 
@@ -800,16 +915,48 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
                   <h3 className="text-white font-bold tracking-wider flex items-center gap-2"><Bot size={18}/> AGENT CONFIG</h3>
                   <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-white"><X size={20}/></button>
               </div>
+              
+              {/* Plugins / MCP Market */}
               <div className="mb-8">
-                  <h4 className="text-xs text-gray-500 font-bold uppercase mb-4 tracking-widest flex items-center gap-2"><Globe size={12}/> Plugins</h4>
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+                  <h4 className="text-xs text-gray-500 font-bold uppercase mb-4 tracking-widest flex items-center gap-2"><Plug size={12}/> MCP Marketplace</h4>
+                  
+                  {/* Native Search */}
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5 mb-2">
                       <div className="flex items-center gap-3">
                           <div className={`p-1.5 rounded bg-blue-500/20 text-blue-400`}><Globe size={16} /></div>
                           <div><span className="text-sm text-gray-300 block font-medium">Google Search</span></div>
                       </div>
                       <button onClick={() => setAgentConfig(prev => ({ ...prev, enableSearch: !prev.enableSearch }))} className={`w-10 h-5 rounded-full relative transition-colors ${agentConfig.enableSearch ? `bg-${themeColor}-600` : 'bg-gray-700'}`}><div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${agentConfig.enableSearch ? 'translate-x-5' : ''}`}></div></button>
                   </div>
+
+                  {/* Available MCP Plugins */}
+                  <div className="space-y-2">
+                      {availableMCPs.map(plugin => {
+                          const isInstalled = agentConfig.mcpPlugins?.some(p => p.id === plugin.id);
+                          return (
+                              <div key={plugin.id} className="flex flex-col p-3 bg-white/5 rounded-lg border border-white/5 hover:border-white/20 transition-colors">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <div className="flex items-center gap-2">
+                                          <div className="p-1.5 rounded bg-gray-700 text-gray-300"><plugin.icon size={16} /></div>
+                                          <div>
+                                              <span className="text-sm text-gray-200 block font-medium">{plugin.name}</span>
+                                              <span className="text-[10px] text-gray-500 block">{plugin.author} • v{plugin.version}</span>
+                                          </div>
+                                      </div>
+                                      <button 
+                                        onClick={() => toggleMCPPlugin(plugin.id)} 
+                                        className={`px-3 py-1 text-[10px] font-bold rounded uppercase tracking-wider transition-colors ${isInstalled ? `bg-${themeColor}-900/50 text-${themeColor}-400 border border-${themeColor}-500/50` : 'bg-gray-800 text-gray-400 hover:text-white'}`}
+                                      >
+                                          {isInstalled ? 'INSTALLED' : 'INSTALL'}
+                                      </button>
+                                  </div>
+                                  <p className="text-xs text-gray-500 leading-relaxed">{plugin.description}</p>
+                              </div>
+                          );
+                      })}
+                  </div>
               </div>
+
               <div className="mb-8">
                   <h4 className="text-xs text-gray-500 font-bold uppercase mb-4 tracking-widest flex items-center gap-2"><Sliders size={12}/> Parameters</h4>
                   <div className="mb-4">

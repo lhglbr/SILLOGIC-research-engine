@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
 import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers } from 'lucide-react';
 
 // --- Configuration per Field ---
 const FIELD_CONFIG = {
@@ -16,7 +16,7 @@ const FIELD_CONFIG = {
     tasks: [
       { id: ResearchTask.DEEP_SEARCH, title: "Literature Review", desc: "ArXiv/APS synthesis", icon: FileSearch },
       { id: ResearchTask.DATA_ANALYSIS, title: "Experimental Data", desc: "Analyze raw datasets", icon: BarChart },
-      { id: ResearchTask.IDEA_GENERATION, title: "Theory Modeling", desc: "Derive physical models", icon: Sigma },
+      { id: ResearchTask.CAD_DESIGN, title: "Instrument Design", desc: "Schematics & Blueprints", icon: Grid },
     ]
   },
   [ResearchField.LIFE]: {
@@ -53,7 +53,7 @@ const FIELD_CONFIG = {
     borderClass: "border-amber-500/50",
     bgClass: "bg-amber-900/20",
     tasks: [
-      { id: ResearchTask.DEEP_SEARCH, title: "State of Art Review", desc: "Patents & Standards", icon: FileSearch },
+      { id: ResearchTask.CAD_DESIGN, title: "CAD & Schematics", desc: "Circuits, PCBs, Floorplans", icon: Layers },
       { id: ResearchTask.IDEA_GENERATION, title: "System Design", desc: "Architectural solutions", icon: Sparkles },
       { id: ResearchTask.PAPER_EDITING, title: "Technical Report", desc: "Documentation & proposals", icon: PenTool },
     ]
@@ -80,7 +80,7 @@ const FIELD_CONFIG = {
     bgClass: "bg-blue-900/20",
     tasks: [
       { id: ResearchTask.DEEP_SEARCH, title: "Deep Research", desc: "Comprehensive review", icon: FileSearch },
-      { id: ResearchTask.PAPER_READING, title: "Paper Reader", desc: "Summarize PDF/Text", icon: FileText },
+      { id: ResearchTask.CAD_DESIGN, title: "Blueprint Gen", desc: "Generate technical drawings", icon: Grid },
       { id: ResearchTask.PAPER_EDITING, title: "Academic Editing", desc: "Polish writing", icon: PenTool },
       { id: ResearchTask.DATA_ANALYSIS, title: "Data Analysis", desc: "Statistical consulting", icon: BarChart },
       { id: ResearchTask.IDEA_GENERATION, title: "Hypothesis Gen", desc: "Brainstorming ideas", icon: Sparkles },

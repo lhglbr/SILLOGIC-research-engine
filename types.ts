@@ -1,4 +1,5 @@
 
+
 export enum AppView {
   LANDING = 'LANDING',
   FIELD_SELECT = 'FIELD_SELECT',
@@ -20,7 +21,8 @@ export enum ResearchTask {
   PAPER_READING = 'Paper Interpretation & Summary',
   PAPER_EDITING = 'Academic Writing & Polishing',
   DATA_ANALYSIS = 'Data Analysis & Visualization',
-  IDEA_GENERATION = 'Hypothesis Generation'
+  IDEA_GENERATION = 'Hypothesis Generation',
+  CAD_DESIGN = 'CAD & Blueprint Design'
 }
 
 export enum ModelProvider {

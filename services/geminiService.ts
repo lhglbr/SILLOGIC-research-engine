@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, GenerateContentResponse, FunctionDeclaration, Type } from "@google/genai";
 import { ResearchField, ResearchTask, ModelProvider, AgentConfig, MCPPlugin } from "../types";
 
@@ -60,6 +61,18 @@ export const getSystemInstruction = (field: ResearchField, task: ResearchTask): 
       - Propose interdisciplinary connections.
       - Suggest experimental designs or theoretical frameworks valid in ${field}.
       - Be creative but scientifically grounded.`;
+      break;
+      
+    case ResearchTask.CAD_DESIGN:
+      specificInstruction = `
+      TASK: CAD & Technical Blueprint Generation
+      OBJECTIVE: Create precise, technical schematic representations.
+      GUIDELINES:
+      - You MUST generate vector graphics using SVG format for all visual requests (circuits, floor plans, parts).
+      - Wrap SVG code in \`\`\`svg ... \`\`\` blocks.
+      - Use standard engineering symbols (resistors, capacitors, logic gates, architectural walls).
+      - Ensure high contrast (white strokes on dark/transparent background) for the blueprint aesthetic.
+      - Do not use external image URLs. Generate the actual SVG code.`;
       break;
 
     default:

@@ -306,6 +306,92 @@ const MessageBubble: React.FC<{
   );
 };
 
+// 4. Compact Model Dropdown (Upward)
+const ChatModelDropdown: React.FC<{
+  activeModels: ModelProvider[],
+  setActiveModels: (models: ModelProvider[]) => void,
+  themeColor: string
+}> = ({ activeModels, setActiveModels, themeColor }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleModel = (id: ModelProvider) => {
+     if (activeModels.includes(id)) {
+         if (activeModels.length > 1) setActiveModels(activeModels.filter(m => m !== id));
+     } else {
+         if (activeModels.length < 3) setActiveModels([...activeModels, id]);
+     }
+  };
+
+  const getButtonLabel = () => {
+    if (activeModels.length === 0) return "Select Engine";
+    
+    // Generate label: "Flash + Pro + Claude"
+    const names = activeModels.map(id => {
+        const m = AVAILABLE_MODELS.find(mod => mod.id === id);
+        if (!m) return "";
+        // Simplified naming for the badge
+        if (m.name.includes("Flash")) return "Flash";
+        if (m.name.includes("Pro")) return "Pro";
+        if (m.name.includes("Thinking")) return "Thinking";
+        if (m.name.includes("GPT")) return "GPT-4o";
+        if (m.name.includes("o1")) return "o1";
+        if (m.name.includes("Claude")) return "Claude";
+        if (m.name.includes("Llama")) return "Llama";
+        if (m.name.includes("DeepSeek")) return "DeepSeek";
+        return m.name.split(" ")[0];
+    });
+    return names.join(" + ");
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-xs font-mono uppercase tracking-wider ${isOpen ? `bg-${themeColor}-600/20 border-${themeColor}-500 text-${themeColor}-400` : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'}`}
+      >
+        <Cpu size={14} />
+        <span className="max-w-[200px] truncate">{getButtonLabel()}</span>
+        {isOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+      </button>
+
+      {isOpen && (
+        <div className="absolute bottom-full mb-2 left-0 w-64 bg-[#0f0f11] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden max-h-64 overflow-y-auto">
+          <div className="p-2 border-b border-white/5 bg-white/5">
+              <span className="text-[10px] text-gray-500 font-bold uppercase">Select up to 3 Models</span>
+          </div>
+          {AVAILABLE_MODELS.map((model) => {
+            const isSelected = activeModels.includes(model.id);
+            return (
+              <button
+                key={model.id}
+                onClick={() => toggleModel(model.id)}
+                className={`w-full flex items-center justify-between p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors ${isSelected ? `bg-${themeColor}-900/10` : ''}`}
+              >
+                 <div className="flex flex-col text-left">
+                    <span className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-gray-400'}`}>{model.name}</span>
+                    <span className="text-[10px] text-gray-600 truncate max-w-[160px]">{model.desc}</span>
+                 </div>
+                 {isSelected && <Check size={14} className={`text-${themeColor}-400`} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- Main Chat Pane Hook ---
 const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext) => {
     const [history, setHistory] = useState<ChatMessage[]>(initialHistory);
@@ -571,30 +657,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, onBa
 
         {/* Input Area (Global but targeted to active pane) */}
         <div className="p-4 bg-black/80 backdrop-blur border-t border-white/10 z-30">
-             {/* Model Toggles */}
-             <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide">
-                 <span className="text-[10px] uppercase font-bold text-gray-600 mr-2 shrink-0">Active Cluster:</span>
-                 {AVAILABLE_MODELS.map(model => {
-                     const isSelected = activeSession.activeModels.includes(model.id);
-                     return (
-                         <button
-                            key={model.id}
-                            onClick={() => {
-                                const current = activeSession.activeModels;
-                                if (isSelected && current.length > 1) activeSession.setActiveModels(current.filter(m => m !== model.id));
-                                else if (!isSelected && current.length < 3) activeSession.setActiveModels([...current, model.id]);
-                            }}
-                            className={`px-2 py-1 rounded text-[10px] font-mono border transition-all whitespace-nowrap ${isSelected ? `bg-${themeColor}-600/20 border-${themeColor}-500 text-${themeColor}-400` : 'bg-transparent border-gray-700 text-gray-500 hover:border-gray-500'}`}
-                         >
-                             {model.name}
-                         </button>
-                     )
-                 })}
-                 <div className="ml-auto flex items-center gap-2">
-                     <button onClick={() => handleExport(activeSession.history)} className="p-1 text-gray-500 hover:text-white" title="Export Chat">
-                         <FileDown size={14}/>
-                     </button>
-                 </div>
+             {/* Model Toggles (Now Dropdown) */}
+             <div className="flex items-center justify-between mb-3">
+                 <ChatModelDropdown 
+                    activeModels={activeSession.activeModels} 
+                    setActiveModels={activeSession.setActiveModels} 
+                    themeColor={themeColor}
+                 />
+                 <button onClick={() => handleExport(activeSession.history)} className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-white transition-colors">
+                     <FileDown size={14}/> Export Chat
+                 </button>
              </div>
 
              {/* Input Box */}

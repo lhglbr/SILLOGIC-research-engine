@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -525,7 +526,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
   };
 
   const handleExport = (history: ChatMessage[]) => {
-      const text = history.map(m => `**${m.role.toUpperCase()}**: ${m.multiResponses ? m.multiResponses.map(r => r.content).join('\n---\n') : m.content}`).join('\n\n');
+      const date = new Date().toLocaleString();
+      let text = `# ProtoChat Export - ${date}\n\n`;
+      text += history.map(m => {
+          const role = m.role === 'user' ? 'User' : 'ProtoChat';
+          const content = m.multiResponses 
+            ? m.multiResponses.map(r => `### Model: ${r.modelName}\n${r.content}`).join('\n\n') 
+            : m.content;
+          return `## ${role}\n\n${content}`;
+      }).join('\n\n---\n\n');
+      
       const blob = new Blob([text], { type: 'text/markdown' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -575,6 +585,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                     <Columns size={18}/>
                 </button>
                 <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-2" />
+                <button onClick={() => handleExport(activeSession.history)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white" title="Export Conversation">
+                    <Download size={18}/>
+                </button>
                 <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white">
                     <Settings size={18}/>
                 </button>
@@ -626,9 +639,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                     setActiveModels={activeSession.setActiveModels} 
                     themeColor={themeColor}
                  />
-                 <button onClick={() => handleExport(activeSession.history)} className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
-                     <FileDown size={14}/> Export Chat
-                 </button>
+                 <span className="text-[10px] text-gray-400 dark:text-gray-600 font-mono">
+                     {activeSession.input.length} chars
+                 </span>
              </div>
 
              <div className={`relative flex items-end gap-2 bg-white dark:bg-[#0c0c0e] rounded-xl p-2 border transition-colors ${activeSession.isLoading ? 'border-gray-200 dark:border-white/5 opacity-50' : `border-gray-300 dark:border-white/10 focus-within:border-${themeColor}-400 dark:focus-within:border-${themeColor}-500/50`}`}>

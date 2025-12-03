@@ -644,7 +644,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
         {/* Header */}
         <div className="h-16 border-b dark:border-white/10 border-gray-200 dark:bg-black/40 bg-white/80 backdrop-blur flex items-center justify-between px-6 z-20">
             <div className="flex items-center gap-4">
-                <button onClick={onToggleSidebar} className="lg:hidden p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-gray-500">
+                <button onClick={onToggleSidebar} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-gray-500">
                     <Menu size={20} />
                 </button>
                 <button onClick={onBack} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors">

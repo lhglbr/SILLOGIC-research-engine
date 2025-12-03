@@ -1,8 +1,9 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
 import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext, ChatSession } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout, PanelLeftClose } from 'lucide-react';
 
 // --- Localization Resources ---
 
@@ -293,6 +294,7 @@ const LanguageToggle: React.FC<{ lang: 'en' | 'zh', toggle: () => void }> = ({ l
 
 const Sidebar: React.FC<{
   isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
   sessions: Record<string, ChatSession>;
   currentSessionId: string;
   onSelectSession: (id: string) => void;
@@ -303,34 +305,43 @@ const Sidebar: React.FC<{
   toggleTheme: () => void;
   toggleLang: () => void;
   themeColor: string;
-}> = ({ isOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, lang, isDarkMode, toggleTheme, toggleLang, themeColor }) => {
+}> = ({ isOpen, setIsOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, lang, isDarkMode, toggleTheme, toggleLang, themeColor }) => {
     const txt = APP_TEXT[lang];
     const sessionList = (Object.values(sessions) as ChatSession[]).sort((a, b) => b.timestamp - a.timestamp);
 
     return (
-        <div className={`fixed inset-y-0 left-0 z-40 bg-gray-100/90 dark:bg-black/90 backdrop-blur-md border-r border-gray-200 dark:border-white/10 transition-all duration-300 flex flex-col ${isOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
-            <div className="p-4 border-b border-gray-200 dark:border-white/10">
+        <div className={`fixed inset-y-0 left-0 z-40 bg-gray-100/95 dark:bg-[#0c0c0e]/95 backdrop-blur-xl border-r border-gray-200 dark:border-white/10 transition-transform duration-300 flex flex-col w-72 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+            <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between gap-2">
                 <button 
                     onClick={onNewChat}
-                    className={`w-full py-2 px-3 bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white rounded-lg flex items-center justify-center gap-2 transition-colors font-semibold shadow-lg shadow-${themeColor}-500/20`}
+                    className={`flex-1 py-2 px-3 bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white rounded-lg flex items-center justify-center gap-2 transition-colors font-semibold shadow-lg shadow-${themeColor}-500/20`}
                 >
                     <Plus size={18} />
-                    <span>{txt.newChat}</span>
+                    <span className="text-sm">{txt.newChat}</span>
+                </button>
+                <button 
+                    onClick={() => setIsOpen(false)} 
+                    className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500"
+                >
+                    <PanelLeftClose size={18} />
                 </button>
             </div>
             
             <div className="flex-1 overflow-y-auto p-2">
-                <div className="text-xs font-bold text-gray-500 uppercase px-2 mb-2">{txt.history}</div>
+                <div className="text-xs font-bold text-gray-500 uppercase px-2 mb-2 mt-2">{txt.history}</div>
                 {sessionList.length === 0 ? (
                     <div className="text-center text-gray-400 dark:text-gray-600 text-sm py-4">{txt.noHistory}</div>
                 ) : (
                     sessionList.map(session => (
                         <div 
                             key={session.id}
-                            onClick={() => onSelectSession(session.id)}
+                            onClick={() => {
+                                onSelectSession(session.id);
+                                if (window.innerWidth < 768) setIsOpen(false); // Auto close on mobile
+                            }}
                             className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors mb-1 ${session.id === currentSessionId ? `bg-gray-200 dark:bg-white/10 text-gray-900 dark:text-white` : 'hover:bg-gray-200 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400'}`}
                         >
-                            <MessageSquare size={16} />
+                            <MessageSquare size={16} className="shrink-0" />
                             <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium truncate">{session.title || txt.newChat}</div>
                                 <div className="text-[10px] opacity-60 truncate">{new Date(session.timestamp).toLocaleDateString()}</div>
@@ -364,7 +375,7 @@ const App: React.FC = () => {
     language: 'en'
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Session Management
   const [sessions, setSessions] = useState<Record<string, ChatSession>>({});
@@ -450,6 +461,7 @@ const App: React.FC = () => {
         updateSession(activeSessionId, { activeModels: context.models });
       }
       setView(AppView.WORKSPACE);
+      setSidebarOpen(true);
   };
 
   // --- Views ---
@@ -609,10 +621,11 @@ const App: React.FC = () => {
         {view === AppView.TASK_SELECT && <TaskSelectView />}
         
         {view === AppView.WORKSPACE && (
-          <div className="flex h-screen w-full">
-            {/* Sidebar */}
+          <div className="flex h-screen w-full relative">
+            {/* Sidebar (Floating on Mobile, Docked on Desktop) */}
             <Sidebar 
                 isOpen={sidebarOpen}
+                setIsOpen={setSidebarOpen}
                 sessions={sessions}
                 currentSessionId={activeSessionId || ''}
                 onSelectSession={setActiveSessionId}
@@ -625,8 +638,16 @@ const App: React.FC = () => {
                 themeColor={activeTheme.color}
             />
 
-            {/* Chat Interface */}
-            <div className={`flex-1 flex flex-col h-full transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>
+            {/* Backdrop for mobile only - allows click-outside to close */}
+            {sidebarOpen && (
+                <div 
+                    className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm md:hidden"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
+            {/* Chat Interface - Pushed by Sidebar on Desktop, Full width on Mobile */}
+            <div className={`flex-1 flex flex-col h-full transition-all duration-300 w-full ${sidebarOpen ? 'md:ml-72' : 'ml-0'}`}>
                 {activeSessionId && sessions[activeSessionId] ? (
                     <ChatInterface 
                         key={activeSessionId} // Forces remount when switching sessions

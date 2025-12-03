@@ -9,7 +9,7 @@ import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircu
 const APP_TEXT = {
   en: {
     landingTitle: "ProtoChat",
-    landingSubtitle: "The ultimate research companion. Exploring the intersection of mathematical beauty and artificial intelligence.",
+    landingSubtitle: "The ultimate research companion.",
     initResearch: "Initialize Research",
     footer: "Powered by Gemini • Three.js • React",
     selectFieldTitle: "Select Research Discipline",
@@ -33,7 +33,7 @@ const APP_TEXT = {
   },
   zh: {
     landingTitle: "ProtoChat",
-    landingSubtitle: "您的终极科研伴侣。探索数学之美与人工智能的交汇点。",
+    landingSubtitle: "您的终极科研伴侣。",
     initResearch: "开始研究",
     footer: "由 Gemini • Three.js • React 驱动",
     selectFieldTitle: "选择研究学科",

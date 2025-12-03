@@ -199,7 +199,7 @@ const getModelsList = (lang: 'en' | 'zh') => {
 const ModelDropdown: React.FC<{ 
   selectedModels: ModelProvider[], 
   onToggle: (id: ModelProvider) => void,
-  themeColor: string,
+  themeColor: string, 
   lang: 'en' | 'zh',
   modelsList: any[]
 }> = ({ selectedModels, onToggle, themeColor, lang, modelsList }) => {
@@ -443,7 +443,12 @@ const App: React.FC = () => {
   };
 
   const handleLaunch = () => {
-      if (!activeSessionId) createNewSession();
+      if (!activeSessionId) {
+        createNewSession();
+      } else {
+        // Ensure the active session inherits the selected models from the setup screen
+        updateSession(activeSessionId, { activeModels: context.models });
+      }
       setView(AppView.WORKSPACE);
   };
 

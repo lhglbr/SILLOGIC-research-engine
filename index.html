@@ -11,14 +11,14 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Agency FB', 'Rajdhani', 'sans-serif'],
+              sans: ['Google Sans', 'Plus Jakarta Sans', 'sans-serif'],
               mono: ['JetBrains Mono', 'monospace'],
             },
           },
         },
       }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
     <script type="importmap">
@@ -43,13 +43,13 @@
 </script>
     <style>
       body {
-        font-family: 'Agency FB', 'Rajdhani', sans-serif;
+        font-family: 'Google Sans', 'Plus Jakarta Sans', sans-serif;
         background-color: transparent; 
         color: #1a1a1a; /* Default to dark text for light mode */
         overflow: hidden; 
         margin: 0;
         padding: 0;
-        letter-spacing: 0.05em; 
+        letter-spacing: 0; /* Standard letter spacing for modern sans fonts */
         transition: background-color 0.3s ease, color 0.3s ease;
       }
       /* Dark mode override via class */
@@ -100,8 +100,8 @@
       
       /* Enhance input placeholder visibility */
       input::placeholder, textarea::placeholder {
-        font-family: 'Agency FB', 'Rajdhani', sans-serif;
-        letter-spacing: 0.05em;
+        font-family: 'Google Sans', 'Plus Jakarta Sans', sans-serif;
+        letter-spacing: 0;
       }
 
       /* Markdown Styles - Light Mode Default */

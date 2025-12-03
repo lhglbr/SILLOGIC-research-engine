@@ -60,6 +60,14 @@ export interface ChatMessage {
   multiResponses?: MultiModelResponse[];
 }
 
+export interface ChatSession {
+  id: string;
+  title: string;
+  timestamp: number;
+  history: ChatMessage[];
+  activeModels: ModelProvider[];
+}
+
 // --- MCP Definitions ---
 export interface MCPTool {
   name: string;

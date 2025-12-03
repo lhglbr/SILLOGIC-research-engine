@@ -1,21 +1,23 @@
 
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Command, Settings, Mic, Volume2, Globe, Bot, Layers, Plus, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle } from 'lucide-react';
+import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle, Globe, Settings, Bot, Menu } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
-import { ChatMessage, UserContext, ModelProvider, AgentConfig, MCPPlugin, MCPTool, MultiModelResponse, ResearchField, ResearchTask } from '../types';
+import { ChatMessage, UserContext, ModelProvider, AgentConfig, MCPPlugin, MCPTool, MultiModelResponse, ResearchField, ResearchTask, ChatSession } from '../types';
 import { streamResponse } from '../services/geminiService';
 
 interface ChatInterfaceProps {
   context: UserContext;
   themeColor: string;
   isDarkMode: boolean;
+  initialSessionData?: ChatSession;
+  onUpdateSession?: (data: Partial<ChatSession>) => void;
   onBack: () => void;
   onToggleLanguage: () => void;
+  onToggleSidebar?: () => void;
 }
 
 // --- Translations ---
@@ -440,7 +442,7 @@ const ChatModelDropdown: React.FC<{
 };
 
 // --- Main Chat Pane Hook ---
-const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext) => {
+const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext, onUpdate?: (data: any) => void) => {
     const [history, setHistory] = useState<ChatMessage[]>(initialHistory);
     const [isLoading, setIsLoading] = useState(false);
     const [input, setInput] = useState("");
@@ -448,6 +450,13 @@ const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext
     
     // Active Models State for this session
     const [activeModels, setActiveModels] = useState<ModelProvider[]>(context.models);
+
+    // Sync state changes to parent (Sidebar history)
+    useEffect(() => {
+        if (onUpdate && history.length > 0) {
+            onUpdate({ history, activeModels });
+        }
+    }, [history, activeModels]);
 
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -547,7 +556,7 @@ const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext
 
 // --- Main Component ---
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDarkMode, onBack, onToggleLanguage }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDarkMode, initialSessionData, onUpdateSession, onBack, onToggleLanguage, onToggleSidebar }) => {
   const [panes, setPanes] = useState<number[]>([1]); 
   const [activePaneIdx, setActivePaneIdx] = useState(0);
   
@@ -559,14 +568,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
 
   const bottomRef = useRef<HTMLDivElement>(null);
   
-  const session1 = useChatSession([], context);
-  const session2 = useChatSession([], context);
+  // Use session1 as the primary session that syncs with parent (sidebar history)
+  const session1 = useChatSession(initialSessionData?.history || [], context, onUpdateSession);
+  const session2 = useChatSession([], context); // Secondary split pane, ephemeral for now
 
   const isSplit = panes.length > 1;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [session1.history, session2.history]);
+
+  // Handle Initial Data Change (switching sessions from sidebar)
+  useEffect(() => {
+      if (initialSessionData) {
+          session1.setHistory(initialSessionData.history);
+          if (initialSessionData.activeModels) session1.setActiveModels(initialSessionData.activeModels);
+      }
+  }, [initialSessionData?.id]);
 
   const handleFork = (msgId: string, fromSession: number) => {
       if (isSplit) return; 
@@ -589,12 +607,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
   const handleExport = (history: ChatMessage[]) => {
       const date = new Date().toLocaleString();
       let text = `# ProtoChat Export - ${date}\n\n`;
+      text += `**Field:** ${context.field}\n**Task:** ${context.task}\n\n---\n\n`;
       text += history.map(m => {
-          const role = m.role === 'user' ? 'User' : 'ProtoChat';
+          const role = m.role === 'user' ? '## User' : '## ProtoChat';
+          const time = new Date(m.timestamp).toLocaleTimeString();
           const content = m.multiResponses 
             ? m.multiResponses.map(r => `### Model: ${r.modelName}\n${r.content}`).join('\n\n') 
             : m.content;
-          return `## ${role}\n\n${content}`;
+          return `${role} (${time})\n\n${content}`;
       }).join('\n\n---\n\n');
       
       const blob = new Blob([text], { type: 'text/markdown' });
@@ -624,6 +644,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
         {/* Header */}
         <div className="h-16 border-b dark:border-white/10 border-gray-200 dark:bg-black/40 bg-white/80 backdrop-blur flex items-center justify-between px-6 z-20">
             <div className="flex items-center gap-4">
+                <button onClick={onToggleSidebar} className="lg:hidden p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-gray-500">
+                    <Menu size={20} />
+                </button>
                 <button onClick={onBack} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors">
                     <ChevronLeft size={20} />
                 </button>
@@ -641,16 +664,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
             <div className="flex items-center gap-2">
                 <button 
                   onClick={onToggleLanguage}
-                  className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1 font-mono text-xs"
+                  className="hidden md:flex p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white items-center gap-1 font-mono text-xs"
                   title="Switch Language"
                 >
                     <Globe size={18}/> {context.language === 'en' ? 'EN' : 'ZH'}
                 </button>
-                <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-2" />
-                <button onClick={() => isSplit ? setPanes([1]) : null} className={`p-2 rounded-lg ${!isSplit ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
+                <div className="hidden md:block w-px h-6 bg-gray-200 dark:bg-white/10 mx-2" />
+                <button onClick={() => isSplit ? setPanes([1]) : null} className={`hidden md:block p-2 rounded-lg ${!isSplit ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
                     <MessageSquare size={18}/>
                 </button>
-                <button onClick={() => !isSplit && session1.history.length > 0 ? setPanes([1,2]) : null} className={`p-2 rounded-lg ${isSplit ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
+                <button onClick={() => !isSplit && session1.history.length > 0 ? setPanes([1,2]) : null} className={`hidden md:block p-2 rounded-lg ${isSplit ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
                     <Columns size={18}/>
                 </button>
                 <button onClick={() => handleExport(activeSession.history)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white" title={t.export}>

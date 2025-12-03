@@ -1,9 +1,8 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
-import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages } from 'lucide-react';
+import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext, ChatSession } from './types';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout } from 'lucide-react';
 
 // --- Localization Resources ---
 
@@ -27,6 +26,10 @@ const APP_TEXT = {
     maxModels: "MAXIMUM 3 MODELS SIMULTANEOUSLY",
     back: "← Back",
     launch: "Launch Workspace",
+    newChat: "New Chat",
+    history: "History",
+    noHistory: "No saved sessions",
+    today: "Today",
   },
   zh: {
     landingTitle: "ProtoChat",
@@ -47,6 +50,10 @@ const APP_TEXT = {
     maxModels: "同时最多支持 3 个模型",
     back: "← 返回",
     launch: "启动工作区",
+    newChat: "新对话",
+    history: "历史记录",
+    noHistory: "暂无历史记录",
+    today: "今天",
   }
 };
 
@@ -284,6 +291,70 @@ const LanguageToggle: React.FC<{ lang: 'en' | 'zh', toggle: () => void }> = ({ l
   </button>
 );
 
+const Sidebar: React.FC<{
+  isOpen: boolean;
+  sessions: Record<string, ChatSession>;
+  currentSessionId: string;
+  onSelectSession: (id: string) => void;
+  onNewChat: () => void;
+  onDeleteSession: (id: string, e: React.MouseEvent) => void;
+  lang: 'en' | 'zh';
+  isDarkMode: boolean;
+  toggleTheme: () => void;
+  toggleLang: () => void;
+  themeColor: string;
+}> = ({ isOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, lang, isDarkMode, toggleTheme, toggleLang, themeColor }) => {
+    const txt = APP_TEXT[lang];
+    const sessionList = (Object.values(sessions) as ChatSession[]).sort((a, b) => b.timestamp - a.timestamp);
+
+    return (
+        <div className={`fixed inset-y-0 left-0 z-40 bg-gray-100/90 dark:bg-black/90 backdrop-blur-md border-r border-gray-200 dark:border-white/10 transition-all duration-300 flex flex-col ${isOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
+            <div className="p-4 border-b border-gray-200 dark:border-white/10">
+                <button 
+                    onClick={onNewChat}
+                    className={`w-full py-2 px-3 bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white rounded-lg flex items-center justify-center gap-2 transition-colors font-semibold shadow-lg shadow-${themeColor}-500/20`}
+                >
+                    <Plus size={18} />
+                    <span>{txt.newChat}</span>
+                </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-2">
+                <div className="text-xs font-bold text-gray-500 uppercase px-2 mb-2">{txt.history}</div>
+                {sessionList.length === 0 ? (
+                    <div className="text-center text-gray-400 dark:text-gray-600 text-sm py-4">{txt.noHistory}</div>
+                ) : (
+                    sessionList.map(session => (
+                        <div 
+                            key={session.id}
+                            onClick={() => onSelectSession(session.id)}
+                            className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors mb-1 ${session.id === currentSessionId ? `bg-gray-200 dark:bg-white/10 text-gray-900 dark:text-white` : 'hover:bg-gray-200 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400'}`}
+                        >
+                            <MessageSquare size={16} />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">{session.title || txt.newChat}</div>
+                                <div className="text-[10px] opacity-60 truncate">{new Date(session.timestamp).toLocaleDateString()}</div>
+                            </div>
+                            <button 
+                                onClick={(e) => onDeleteSession(session.id, e)}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 hover:text-red-500 rounded transition-all"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            <div className="p-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
+                <ThemeToggle isDarkMode={isDarkMode} toggle={toggleTheme} />
+                <LanguageToggle lang={lang} toggle={toggleLang} />
+            </div>
+        </div>
+    );
+};
+
+
 // --- Main App Component ---
 
 const App: React.FC = () => {
@@ -293,6 +364,11 @@ const App: React.FC = () => {
     language: 'en'
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Session Management
+  const [sessions, setSessions] = useState<Record<string, ChatSession>>({});
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   // Dynamic Configs based on Language
   const fieldConfig = useMemo(() => getFieldConfig(context.language), [context.language]);
@@ -318,27 +394,83 @@ const App: React.FC = () => {
       setContext(prev => ({ ...prev, language: prev.language === 'en' ? 'zh' : 'en' }));
   };
 
+  // --- Session Handlers ---
+  
+  const createNewSession = () => {
+      const newId = Date.now().toString();
+      const newSession: ChatSession = {
+          id: newId,
+          title: "New Research",
+          timestamp: Date.now(),
+          history: [],
+          activeModels: context.models
+      };
+      setSessions(prev => ({ ...prev, [newId]: newSession }));
+      setActiveSessionId(newId);
+  };
+
+  const updateSession = (id: string, data: Partial<ChatSession>) => {
+      setSessions(prev => {
+          const session = prev[id];
+          if (!session) return prev;
+          
+          // Generate title from first user message if generic
+          let title = session.title;
+          if (data.history && data.history.length > 0 && session.title === "New Research") {
+              const firstUserMsg = data.history.find(m => m.role === 'user');
+              if (firstUserMsg) {
+                  title = firstUserMsg.content.slice(0, 30) + (firstUserMsg.content.length > 30 ? '...' : '');
+              }
+          }
+
+          return {
+              ...prev,
+              [id]: { ...session, ...data, title }
+          };
+      });
+  };
+
+  const deleteSession = (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setSessions(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+      });
+      if (activeSessionId === id) {
+          setActiveSessionId(null);
+      }
+  };
+
+  const handleLaunch = () => {
+      if (!activeSessionId) createNewSession();
+      setView(AppView.WORKSPACE);
+  };
+
   // --- Views ---
 
   const LandingView = () => (
-    <div className="h-screen flex flex-col justify-center items-center z-10 relative px-4">
-      <div className="mb-8 p-4 bg-white/50 dark:bg-white/5 rounded-full border border-black/5 dark:border-white/10 backdrop-blur-sm animate-pulse shadow-lg dark:shadow-none">
-        <BrainCircuit className="w-12 h-12 text-blue-600 dark:text-blue-400" />
+    <div className="h-screen flex flex-col justify-center items-center z-10 relative px-4 text-center">
+      {/* Container for content with Glass Effect */}
+      <div className="p-12 rounded-3xl border border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-lg shadow-2xl flex flex-col items-center max-w-4xl w-full mx-4">
+          <div className="mb-6 p-4 bg-white/50 dark:bg-white/5 rounded-full border border-black/5 dark:border-white/10 backdrop-blur-sm animate-pulse shadow-lg dark:shadow-none">
+            <BrainCircuit className="w-12 h-12 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h1 className="text-6xl md:text-8xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-gray-800 to-blue-600 dark:from-blue-200 dark:via-white dark:to-blue-200 text-center tracking-tighter mb-6 font-mono drop-shadow-sm">
+            {txt.landingTitle}
+          </h1>
+          <p className="text-gray-800 dark:text-gray-200 text-lg md:text-xl max-w-2xl text-center mb-12 font-light leading-relaxed">
+            {txt.landingSubtitle}
+          </p>
+          <button 
+            onClick={() => setView(AppView.FIELD_SELECT)}
+            className="group relative px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-black font-bold text-lg rounded-full hover:bg-gray-800 dark:hover:bg-blue-50 transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-xl"
+          >
+            <span className="relative z-10">{txt.initResearch}</span>
+            <ChevronRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-emerald-400 opacity-0 group-hover:opacity-20 transition-opacity"></div>
+          </button>
       </div>
-      <h1 className="text-6xl md:text-8xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-gray-800 to-blue-600 dark:from-blue-200 dark:via-white dark:to-blue-200 text-center tracking-tighter mb-6 font-mono drop-shadow-sm">
-        {txt.landingTitle}
-      </h1>
-      <p className="text-gray-600 dark:text-gray-400 text-lg md:text-xl max-w-2xl text-center mb-12 font-light">
-        {txt.landingSubtitle}
-      </p>
-      <button 
-        onClick={() => setView(AppView.FIELD_SELECT)}
-        className="group relative px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-black font-bold text-lg rounded-full hover:bg-gray-800 dark:hover:bg-blue-50 transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-xl"
-      >
-        <span className="relative z-10">{txt.initResearch}</span>
-        <ChevronRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-emerald-400 opacity-0 group-hover:opacity-20 transition-opacity"></div>
-      </button>
 
       <div className="absolute bottom-8 text-xs text-gray-500 dark:text-gray-600 font-mono">
         {txt.footer}
@@ -443,7 +575,7 @@ const App: React.FC = () => {
           <button onClick={() => setView(AppView.FIELD_SELECT)} className="text-gray-500 hover:text-gray-900 dark:hover:text-white">{txt.back}</button>
           <button 
             disabled={!context.task}
-            onClick={() => setView(AppView.WORKSPACE)}
+            onClick={handleLaunch}
             className={`px-8 py-3 bg-${activeTheme.color}-600 hover:bg-${activeTheme.color}-500 disabled:bg-gray-300 disabled:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-500 text-white font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg`}
           >
             {txt.launch} <ChevronRight size={18} />
@@ -458,24 +590,57 @@ const App: React.FC = () => {
       <div className="relative min-h-screen text-gray-900 dark:text-gray-100 font-sans selection:bg-blue-500/30 bg-gray-50 dark:bg-black transition-colors duration-500">
         <ParticleBackground field={context.field} isDarkMode={isDarkMode} />
         
-        {/* Global Controls */}
-        <div className="fixed bottom-6 left-6 z-50 flex flex-col gap-2">
-           <ThemeToggle isDarkMode={isDarkMode} toggle={() => setIsDarkMode(!isDarkMode)} />
-           <LanguageToggle lang={context.language} toggle={toggleLanguage} />
-        </div>
+        {/* Global Controls - Only visible when NOT in workspace */}
+        {view !== AppView.WORKSPACE && (
+            <div className="fixed top-1/2 left-6 -translate-y-1/2 z-50 flex flex-col gap-2">
+                <ThemeToggle isDarkMode={isDarkMode} toggle={() => setIsDarkMode(!isDarkMode)} />
+                <LanguageToggle lang={context.language} toggle={toggleLanguage} />
+            </div>
+        )}
 
         {/* View Router */}
         {view === AppView.LANDING && <LandingView />}
         {view === AppView.FIELD_SELECT && <FieldSelectView />}
         {view === AppView.TASK_SELECT && <TaskSelectView />}
+        
         {view === AppView.WORKSPACE && (
-          <ChatInterface 
-            context={context} 
-            themeColor={activeTheme.color}
-            isDarkMode={isDarkMode}
-            onBack={() => setView(AppView.TASK_SELECT)} 
-            onToggleLanguage={toggleLanguage}
-          />
+          <div className="flex h-screen w-full">
+            {/* Sidebar */}
+            <Sidebar 
+                isOpen={sidebarOpen}
+                sessions={sessions}
+                currentSessionId={activeSessionId || ''}
+                onSelectSession={setActiveSessionId}
+                onNewChat={createNewSession}
+                onDeleteSession={deleteSession}
+                lang={context.language}
+                isDarkMode={isDarkMode}
+                toggleTheme={() => setIsDarkMode(!isDarkMode)}
+                toggleLang={toggleLanguage}
+                themeColor={activeTheme.color}
+            />
+
+            {/* Chat Interface */}
+            <div className={`flex-1 flex flex-col h-full transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>
+                {activeSessionId && sessions[activeSessionId] ? (
+                    <ChatInterface 
+                        key={activeSessionId} // Forces remount when switching sessions
+                        context={context} 
+                        themeColor={activeTheme.color}
+                        isDarkMode={isDarkMode}
+                        initialSessionData={sessions[activeSessionId]}
+                        onUpdateSession={(data) => updateSession(activeSessionId, data)}
+                        onBack={() => setView(AppView.TASK_SELECT)} 
+                        onToggleLanguage={toggleLanguage}
+                        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                    />
+                ) : (
+                    <div className="flex items-center justify-center h-full">
+                         <button onClick={createNewSession} className="px-4 py-2 bg-blue-600 text-white rounded">Create Session</button>
+                    </div>
+                )}
+            </div>
+          </div>
         )}
       </div>
     </div>

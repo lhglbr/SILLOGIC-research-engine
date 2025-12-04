@@ -1,10 +1,13 @@
+
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
-import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext, ChatSession, AuthStrategy } from './types';
+import { PricingModal } from './components/PricingModal';
+import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext, ChatSession, AuthStrategy, SubscriptionTier } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginScreen } from './components/Login';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout, PanelLeftClose, LogOut, User } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout, PanelLeftClose, LogOut, User, Crown, Gem } from 'lucide-react';
 
 // --- Localization Resources ---
 
@@ -33,7 +36,9 @@ const APP_TEXT = {
     noHistory: "No saved sessions",
     today: "Today",
     logout: "Sign Out",
-    profile: "Profile"
+    profile: "Profile",
+    upgrade: "Upgrade Plan",
+    plan: "Plan"
   },
   zh: {
     landingTitle: "ProtoChat",
@@ -59,7 +64,9 @@ const APP_TEXT = {
     noHistory: "暂无历史记录",
     today: "今天",
     logout: "退出登录",
-    profile: "个人资料"
+    profile: "个人资料",
+    upgrade: "升级方案",
+    plan: "方案"
   }
 };
 
@@ -311,10 +318,18 @@ const Sidebar: React.FC<{
   toggleLang: () => void;
   themeColor: string;
   fieldConfig: any;
-}> = ({ isOpen, setIsOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, lang, isDarkMode, toggleTheme, toggleLang, themeColor, fieldConfig }) => {
+  onUpgrade: () => void;
+}> = ({ isOpen, setIsOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, lang, isDarkMode, toggleTheme, toggleLang, themeColor, fieldConfig, onUpgrade }) => {
     const txt = APP_TEXT[lang];
     const sessionList = (Object.values(sessions) as ChatSession[]).sort((a, b) => b.timestamp - a.timestamp);
     const { user, logout, strategy } = useAuth();
+    
+    // Determine badge color based on tier
+    const getTierColor = (tier: string) => {
+        if (tier === SubscriptionTier.TEAM) return "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400";
+        if (tier === SubscriptionTier.PRO) return "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400";
+        return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+    };
 
     return (
         <>
@@ -339,17 +354,29 @@ const Sidebar: React.FC<{
                        )}
                        <div className="min-w-0 flex-1">
                            <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{user?.name}</div>
-                           <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
-                               {strategy === AuthStrategy.LOCAL ? 'DEMO USER' : strategy}
+                           <div className="flex items-center gap-2 mt-0.5">
+                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getTierColor(user?.tier || SubscriptionTier.FREE)} uppercase`}>
+                                   {user?.tier || 'FREE'}
+                               </span>
                            </div>
                        </div>
                    </div>
-                   <button 
-                       onClick={() => logout()}
-                       className="w-full py-1.5 rounded bg-gray-300/50 dark:bg-white/5 hover:bg-red-500 hover:text-white dark:hover:bg-red-900/50 transition-colors text-xs font-semibold text-gray-600 dark:text-gray-300 flex items-center justify-center gap-2"
-                   >
-                       <LogOut size={12}/> {txt.logout}
-                   </button>
+
+                   {/* Subscription Actions */}
+                   <div className="grid grid-cols-2 gap-2 mb-3">
+                       <button 
+                           onClick={onUpgrade}
+                           className="py-1.5 rounded bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold uppercase tracking-wide hover:shadow-lg transition-all flex items-center justify-center gap-1"
+                       >
+                           <Crown size={12} /> {txt.upgrade}
+                       </button>
+                       <button 
+                           onClick={() => logout()}
+                           className="py-1.5 rounded bg-gray-300/50 dark:bg-white/5 hover:bg-red-500 hover:text-white dark:hover:bg-red-900/50 transition-colors text-[10px] font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1"
+                       >
+                           <LogOut size={12}/> {txt.logout}
+                       </button>
+                   </div>
                 </div>
 
                 <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between gap-2">
@@ -427,12 +454,13 @@ const AppContent: React.FC = () => {
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
 
   // Session Management
   const [sessions, setSessions] = useState<Record<string, ChatSession>>({});
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Dynamic Configs based on Language
   const fieldConfig = useMemo(() => getFieldConfig(context.language), [context.language]);
@@ -703,6 +731,14 @@ const AppContent: React.FC = () => {
       <div className="relative min-h-screen text-gray-900 dark:text-gray-100 font-sans selection:bg-blue-500/30 bg-gray-50 dark:bg-black transition-colors duration-500">
         <ParticleBackground field={context.field} isDarkMode={isDarkMode} />
         
+        {showPricing && (
+            <PricingModal 
+                lang={context.language} 
+                onClose={() => setShowPricing(false)} 
+                currentTier={user?.tier || SubscriptionTier.FREE}
+            />
+        )}
+
         {/* Global Controls - Only visible when NOT in workspace */}
         {view !== AppView.WORKSPACE && (
             <div className="fixed left-6 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2">
@@ -733,6 +769,7 @@ const AppContent: React.FC = () => {
                 toggleLang={toggleLanguage}
                 themeColor={activeTheme.color}
                 fieldConfig={fieldConfig}
+                onUpgrade={() => setShowPricing(true)}
             />
 
             {/* Chat Interface - Pushed by Sidebar on Desktop, Full width on Mobile */}

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { ClerkProvider, useUser, useClerk } from '@clerk/clerk-react';
 import { SessionProvider, useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react';
-import { AuthStrategy, UserProfile, AuthState } from '../types';
+import { AuthStrategy, UserProfile, AuthState, SubscriptionTier } from '../types';
 import Cookies from 'js-cookie';
 
 // --- Default Configuration ---
@@ -13,6 +13,7 @@ interface AuthContextType extends AuthState {
   setStrategy: (strategy: AuthStrategy, config?: any) => void;
   updateLocalUser: (name: string, email: string) => void;
   registerLogoutStrategy: (fn: () => Promise<void>) => void;
+  upgradeSubscription: (tier: SubscriptionTier) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,7 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // --- Adapter Components ---
 
 // 1. Clerk Adapter - ONLY renders when inside ClerkProvider, so hooks are safe
-const ClerkAdapter: React.FC<{ children: ReactNode, onUserSync: (u: UserProfile | null) => void }> = ({ children, onUserSync }) => {
+const ClerkAdapter: React.FC<{ children: ReactNode, onUserSync: (u: UserProfile | null) => void, currentTier: SubscriptionTier }> = ({ children, onUserSync, currentTier }) => {
   const { user, isLoaded } = useUser();
   const clerk = useClerk();
   const { registerLogoutStrategy } = useAuth();
@@ -40,18 +41,19 @@ const ClerkAdapter: React.FC<{ children: ReactNode, onUserSync: (u: UserProfile 
         name: user.fullName || user.username || 'User',
         email: user.primaryEmailAddress?.emailAddress || '',
         avatar: user.imageUrl,
-        role: 'researcher'
+        role: 'researcher',
+        tier: currentTier // In a real app, this would come from Clerk publicMetadata
       });
     } else if (isLoaded && !user) {
       onUserSync(null);
     }
-  }, [user, isLoaded, onUserSync]);
+  }, [user, isLoaded, onUserSync, currentTier]);
 
   return <>{children}</>;
 };
 
 // 2. NextAuth Adapter
-const NextAuthAdapter: React.FC<{ children: ReactNode, onUserSync: (u: UserProfile | null) => void }> = ({ children, onUserSync }) => {
+const NextAuthAdapter: React.FC<{ children: ReactNode, onUserSync: (u: UserProfile | null) => void, currentTier: SubscriptionTier }> = ({ children, onUserSync, currentTier }) => {
   const { data: session, status } = useSession();
   const { registerLogoutStrategy } = useAuth();
 
@@ -68,12 +70,13 @@ const NextAuthAdapter: React.FC<{ children: ReactNode, onUserSync: (u: UserProfi
         name: session.user.name || 'User',
         email: session.user.email || '',
         avatar: session.user.image || undefined,
-        role: 'researcher'
+        role: 'researcher',
+        tier: currentTier
       });
     } else if (status === 'unauthenticated') {
       onUserSync(null);
     }
-  }, [session, status, onUserSync]);
+  }, [session, status, onUserSync, currentTier]);
 
   return <>{children}</>;
 };
@@ -99,6 +102,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
      } catch (e) {
          return {};
      }
+  });
+
+  // Subscription State (Mock Backend Persistence)
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>(() => {
+      try {
+          const saved = Cookies.get('proto_subscription');
+          return (saved as SubscriptionTier) || SubscriptionTier.FREE;
+      } catch {
+          return SubscriptionTier.FREE;
+      }
   });
 
   const [localUser, setLocalUser] = useState<UserProfile | null>(() => {
@@ -143,10 +156,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           name,
           email,
           role: 'researcher',
-          avatar: `https://api.dicebear.com/7.x/shapes/svg?seed=${name}`
+          avatar: `https://api.dicebear.com/7.x/shapes/svg?seed=${name}`,
+          tier: subscriptionTier
       };
       setLocalUser(u);
       Cookies.set('proto_local_user', JSON.stringify(u));
+  };
+
+  const upgradeSubscription = async (tier: SubscriptionTier) => {
+      // Mock API call delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setSubscriptionTier(tier);
+      Cookies.set('proto_subscription', tier);
+
+      // Propagate change to current user object
+      if (strategy === AuthStrategy.LOCAL && localUser) {
+          const updated = { ...localUser, tier };
+          setLocalUser(updated);
+          Cookies.set('proto_local_user', JSON.stringify(updated));
+      } 
+      // For adapters, the useEffect dependencies will catch the `subscriptionTier` change
+      // and update `adapterUser` automatically via the onUserSync callbacks.
   };
 
   // Unified actions
@@ -188,7 +219,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // Derived State
-  const activeUser = strategy === AuthStrategy.LOCAL ? localUser : adapterUser;
+  // Merge the ephemeral adapter user with the persistent subscription tier
+  const activeAdapterUser = adapterUser ? { ...adapterUser, tier: subscriptionTier } : null;
+  const activeUser = strategy === AuthStrategy.LOCAL ? localUser : activeAdapterUser;
+  
   const isAuthenticated = !!activeUser;
 
   // Render Logic
@@ -201,7 +235,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (strategy === AuthStrategy.CLERK && isValidClerkKey) {
         return (
             <ClerkProvider publishableKey={cleanClerkKey}>
-                <ClerkAdapter onUserSync={setAdapterUser}>
+                <ClerkAdapter onUserSync={setAdapterUser} currentTier={subscriptionTier}>
                     {children}
                 </ClerkAdapter>
             </ClerkProvider>
@@ -216,7 +250,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (strategy === AuthStrategy.NEXT_AUTH && isValidNextAuthUrl) {
         return (
             <SessionProvider baseUrl={cleanNextAuthUrl} basePath={cleanNextAuthUrl + '/api/auth'}>
-                <NextAuthAdapter onUserSync={setAdapterUser}>
+                <NextAuthAdapter onUserSync={setAdapterUser} currentTier={subscriptionTier}>
                     {children}
                 </NextAuthAdapter>
             </SessionProvider>
@@ -239,7 +273,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         logout,
         setStrategy,
         updateLocalUser,
-        registerLogoutStrategy
+        registerLogoutStrategy,
+        upgradeSubscription
     }}>
       {renderProvider()}
     </AuthContext.Provider>

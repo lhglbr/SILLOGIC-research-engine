@@ -1,14 +1,16 @@
 
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle, Globe, Settings, Bot, Menu, BookOpen, UploadCloud, Film, Music, File } from 'lucide-react';
+import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle, Globe, Settings, Bot, Menu, BookOpen, UploadCloud, Film, Music, File, Lock, Crown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
-import { ChatMessage, UserContext, ModelProvider, AgentConfig, MCPPlugin, MCPTool, MultiModelResponse, ResearchField, ResearchTask, ChatSession, KnowledgeFile } from '../types';
+import { ChatMessage, UserContext, ModelProvider, AgentConfig, MCPPlugin, MCPTool, MultiModelResponse, ResearchField, ResearchTask, ChatSession, KnowledgeFile, SubscriptionTier } from '../types';
 import { streamResponse } from '../services/geminiService';
+import { PricingModal } from './PricingModal';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ChatInterfaceProps {
   context: UserContext;
@@ -50,7 +52,9 @@ const TRANSLATIONS = {
         ready: "Ready to research.",
         selectEngine: "Select Engine",
         chars: "chars",
-        files: "files"
+        files: "files",
+        upgradeRequired: "Upgrade Required",
+        unlockModel: "Upgrade to Pro to unlock this model."
     },
     zh: {
         activeCluster: "选择模型引擎",
@@ -79,22 +83,24 @@ const TRANSLATIONS = {
         ready: "准备开始研究。",
         selectEngine: "选择引擎",
         chars: "字符",
-        files: "文件"
+        files: "文件",
+        upgradeRequired: "需要升级",
+        unlockModel: "升级至 Pro 版以解锁此模型。"
     }
 };
 
 // --- Constants ---
 
 const AVAILABLE_MODELS = [
-  { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Google • Fast" },
-  { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Google • Complex Reasoning" },
-  { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Google • Deep Logic" },
-  { id: ModelProvider.OPENAI_GPT4O, name: "GPT-4o", desc: "OpenAI • Omni" },
-  { id: ModelProvider.OPENAI_O1, name: "o1-preview", desc: "OpenAI • Reasoning" },
-  { id: ModelProvider.CLAUDE_3_5_SONNET, name: "Claude 3.5 Sonnet", desc: "Anthropic • Nuance" },
-  { id: ModelProvider.DEEPSEEK_V3, name: "DeepSeek V3", desc: "DeepSeek • Efficient" },
-  { id: ModelProvider.DEEPSEEK_R1, name: "DeepSeek R1", desc: "DeepSeek • Math" },
-  { id: ModelProvider.GROQ_LLAMA_3, name: "Llama 3 70B", desc: "Meta • Fast" },
+  { id: ModelProvider.GEMINI_FLASH, name: "Gemini 2.5 Flash", desc: "Google • Fast", isPro: false },
+  { id: ModelProvider.GEMINI_PRO, name: "Gemini 3.0 Pro", desc: "Google • Complex Reasoning", isPro: true },
+  { id: ModelProvider.GEMINI_THINKING, name: "Gemini 3.0 Thinking", desc: "Google • Deep Logic", isPro: true },
+  { id: ModelProvider.OPENAI_GPT4O, name: "GPT-4o", desc: "OpenAI • Omni", isPro: true },
+  { id: ModelProvider.OPENAI_O1, name: "o1-preview", desc: "OpenAI • Reasoning", isPro: true },
+  { id: ModelProvider.CLAUDE_3_5_SONNET, name: "Claude 3.5 Sonnet", desc: "Anthropic • Nuance", isPro: true },
+  { id: ModelProvider.DEEPSEEK_V3, name: "DeepSeek V3", desc: "DeepSeek • Efficient", isPro: false },
+  { id: ModelProvider.DEEPSEEK_R1, name: "DeepSeek R1", desc: "DeepSeek • Math", isPro: true },
+  { id: ModelProvider.GROQ_LLAMA_3, name: "Llama 3 70B", desc: "Meta • Fast", isPro: false },
 ];
 
 const MOCK_MCP_PLUGINS: MCPPlugin[] = [
@@ -366,15 +372,19 @@ const MessageBubble: React.FC<{
   );
 };
 
-// 4. Compact Model Dropdown
+// 4. Compact Model Dropdown (With Gating)
 const ChatModelDropdown: React.FC<{
   activeModels: ModelProvider[],
   setActiveModels: (models: ModelProvider[]) => void,
   themeColor: string,
-  t: any
-}> = ({ activeModels, setActiveModels, themeColor, t }) => {
+  t: any,
+  onOpenPricing: () => void
+}> = ({ activeModels, setActiveModels, themeColor, t, onOpenPricing }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  
+  const currentTier = user?.tier || SubscriptionTier.FREE;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -386,7 +396,14 @@ const ChatModelDropdown: React.FC<{
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleModel = (id: ModelProvider) => {
+  const toggleModel = (id: ModelProvider, isPro: boolean) => {
+     // Gating Check
+     if (isPro && currentTier === SubscriptionTier.FREE) {
+         setIsOpen(false);
+         onOpenPricing();
+         return;
+     }
+
      if (activeModels.includes(id)) {
          if (activeModels.length > 1) setActiveModels(activeModels.filter(m => m !== id));
      } else {
@@ -417,21 +434,35 @@ const ChatModelDropdown: React.FC<{
 
       {isOpen && (
         <div className="absolute bottom-full mb-2 left-0 w-64 bg-white dark:bg-[#0f0f11] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden max-h-64 overflow-y-auto">
-          <div className="p-2 border-b border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5">
+          <div className="p-2 border-b border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5 flex justify-between items-center">
               <span className="text-[10px] text-gray-500 font-bold uppercase">{t.selectModels}</span>
+              {currentTier === SubscriptionTier.FREE && (
+                  <button onClick={onOpenPricing} className="text-[10px] text-blue-500 hover:underline flex items-center gap-1">
+                      <Crown size={10} /> Upgrade
+                  </button>
+              )}
           </div>
           {AVAILABLE_MODELS.map((model) => {
             const isSelected = activeModels.includes(model.id);
+            const isLocked = model.isPro && currentTier === SubscriptionTier.FREE;
+            
             return (
               <button
                 key={model.id}
-                onClick={() => toggleModel(model.id)}
+                onClick={() => toggleModel(model.id, model.isPro)}
                 className={`w-full flex items-center justify-between p-3 border-b border-gray-100 dark:border-white/5 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${isSelected ? `bg-${themeColor}-50 dark:bg-${themeColor}-900/10` : ''}`}
               >
                  <div className="flex flex-col text-left">
-                    <span className={`text-xs font-semibold ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>{model.name}</span>
+                    <div className="flex items-center gap-2">
+                         <span className={`text-xs font-semibold ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>{model.name}</span>
+                         {model.isPro && <Crown size={10} className="text-yellow-500"/>}
+                    </div>
                  </div>
-                 {isSelected && <Check size={14} className={`text-${themeColor}-600 dark:text-${themeColor}-400`} />}
+                 {isLocked ? (
+                     <Lock size={12} className="text-gray-400" />
+                 ) : (
+                     isSelected && <Check size={14} className={`text-${themeColor}-600 dark:text-${themeColor}-400`} />
+                 )}
               </button>
             );
           })}
@@ -564,9 +595,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
   const [artifact, setArtifact] = useState<{content: string, type: 'svg'|'html'|'react'|'pdb'|'mermaid'}|null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isKbOpen, setIsKbOpen] = useState(false); // Knowledge Base Drawer State
+  const [showPricing, setShowPricing] = useState(false);
+
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeFile[]>(initialSessionData?.knowledgeBase || []);
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(context.config || { temperature: 0.7, topP: 0.95, mcpPlugins: [] });
 
+  const { user } = useAuth();
   const t = context.language === 'zh' ? TRANSLATIONS.zh : TRANSLATIONS.en;
   const bottomRef = useRef<HTMLDivElement>(null);
   
@@ -659,6 +693,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
   return (
     <div className="flex h-screen w-full overflow-hidden relative">
       
+      {showPricing && (
+          <PricingModal 
+            lang={context.language} 
+            onClose={() => setShowPricing(false)} 
+            currentTier={user?.tier || SubscriptionTier.FREE}
+          />
+      )}
+
       {/* LEFT: Chat Area */}
       <div className={`flex-1 flex flex-col transition-all duration-300 ${artifact ? 'mr-[400px]' : ''}`}>
         
@@ -760,6 +802,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                     setActiveModels={activeSession.setActiveModels} 
                     themeColor={themeColor}
                     t={t}
+                    onOpenPricing={() => setShowPricing(true)}
                  />
                  <span className="text-[10px] text-gray-400 dark:text-gray-600 font-mono">
                      {activeSession.input.length} {t.chars}

@@ -121,12 +121,19 @@ export enum AuthStrategy {
   NEXT_AUTH = 'NEXT_AUTH'  // NextAuth.js (Auth.js)
 }
 
+export enum SubscriptionTier {
+  FREE = 'FREE',
+  PRO = 'PRO',
+  TEAM = 'TEAM'
+}
+
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
   avatar?: string;
   role?: 'admin' | 'researcher' | 'viewer';
+  tier: SubscriptionTier;
 }
 
 export interface AuthState {

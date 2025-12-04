@@ -1,7 +1,5 @@
-
-
 import { GoogleGenAI, GenerateContentResponse, FunctionDeclaration, Type } from "@google/genai";
-import { ResearchField, ResearchTask, ModelProvider, AgentConfig, MCPPlugin } from "../types";
+import { ResearchField, ResearchTask, ModelProvider, AgentConfig, MCPPlugin, KnowledgeFile } from "../types";
 
 // Helper to get detailed system instructions
 export const getSystemInstruction = (field: ResearchField, task: ResearchTask, language: 'en' | 'zh' = 'en'): string => {
@@ -101,7 +99,8 @@ const fileToPart = async (file: File): Promise<{ inlineData: { data: string; mim
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
-    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+    // Support Image, Audio, Video, and PDF for Multimodal input
+    if (file.type.startsWith('image/') || file.type.startsWith('audio/') || file.type.startsWith('video/') || file.type === 'application/pdf') {
       reader.onloadend = () => {
         const base64String = (reader.result as string).split(',')[1];
         resolve({
@@ -114,10 +113,10 @@ const fileToPart = async (file: File): Promise<{ inlineData: { data: string; mim
       reader.onerror = reject;
       reader.readAsDataURL(file);
     } else {
-      // Treat as text (code, txt, csv, etc.)
+      // Treat everything else as text (code, txt, csv, md, etc.)
       reader.onloadend = () => {
         resolve({
-          text: `\n\n--- ATTACHED FILE: ${file.name} ---\n${reader.result as string}\n--- END FILE ---\n`
+          text: `\n\n--- FILE ATTACHMENT: ${file.name} ---\n${reader.result as string}\n--- END FILE ---\n`
         });
       };
       reader.onerror = reject;
@@ -167,8 +166,6 @@ const simulateExternalModel = async (
 
 /**
  * MCP BRIDGE: MOCK EXECUTION
- * Since we are in a browser and cannot truly connect to local stdio/databases,
- * we simulate the execution of popular MCP tools.
  */
 const executeMockMCPTool = (toolName: string, args: any): string => {
     console.log(`[MCP Bridge] Executing ${toolName}`, args);
@@ -262,8 +259,11 @@ const callGoogleGenAI = async (
         // Loop to handle tool calls (Multi-turn tool execution)
         let keepGoing = true;
         let currentMessage = { message: messageParts };
+        const maxTurns = 5;
+        let turn = 0;
 
-        while (keepGoing) {
+        while (keepGoing && turn < maxTurns) {
+            turn++;
             keepGoing = false;
             const result = await chat.sendMessageStream(currentMessage);
             
@@ -289,10 +289,25 @@ const callGoogleGenAI = async (
                 for (const call of functionCalls) {
                     onChunk(`\n\n> 🔌 **MCP Protocol Active**: Executing tool \`${call.name}\`...\n\n`);
                     const mockResult = executeMockMCPTool(call.name, call.args);
+                    
+                    let parsedResult;
+                    try {
+                        // Ensure mockResult is a valid JSON string or handle simple strings
+                        const trimmed = mockResult.trim();
+                        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                             parsedResult = JSON.parse(trimmed);
+                        } else {
+                             parsedResult = { result: mockResult };
+                        }
+                    } catch (e) {
+                        console.warn("Tool result parsing failed, using raw string", e);
+                        parsedResult = { result: mockResult };
+                    }
+
                     functionResponses.push({
                         id: call.id,
                         name: call.name,
-                        response: { result: JSON.parse(mockResult) } 
+                        response: { result: parsedResult } 
                     });
                 }
 
@@ -306,77 +321,27 @@ const callGoogleGenAI = async (
     }
 };
 
-/**
- * PROVIDER IMPLEMENTATION: OPENAI (Placeholder/Simulation)
- */
-const callOpenAI = async (
-    history: any[],
-    messageParts: any[],
-    config: any,
-    modelId: ModelProvider,
-    onChunk: (text: string) => void
-) => {
-    console.log(`[API] Routing to OpenAI Interface for ${modelId}`);
-    
-    // Fallback Simulation
+const callOpenAI = async (history: any[], messageParts: any[], config: any, modelId: ModelProvider, onChunk: (text: string) => void) => {
     let persona = "";
     if (modelId === ModelProvider.OPENAI_GPT4O) persona = "\n\n[SYSTEM SIMULATION: GPT-4o]\nYou are acting as GPT-4o. Your style is concise, confident, and versatile.";
-    if (modelId === ModelProvider.OPENAI_O1) {
-        persona = "\n\n[SYSTEM SIMULATION: o1-preview]\nYou are a Reasoning Model. You MUST output your hidden chain of thought enclosed in <think>...</think> tags before your final response. Be extremely verbose in your reasoning.";
-    }
-    
+    if (modelId === ModelProvider.OPENAI_O1) persona = "\n\n[SYSTEM SIMULATION: o1-preview]\nYou are a Reasoning Model. You MUST output your hidden chain of thought enclosed in <think>...</think> tags before your final response.";
     return simulateExternalModel(history, messageParts, config, persona, 'gemini-3-pro-preview', onChunk);
 };
 
-/**
- * PROVIDER IMPLEMENTATION: ANTHROPIC (Placeholder/Simulation)
- */
-const callAnthropic = async (
-    history: any[],
-    messageParts: any[],
-    config: any,
-    modelId: ModelProvider,
-    onChunk: (text: string) => void
-) => {
-    console.log(`[API] Routing to Anthropic Interface for ${modelId}`);
-    
-    // Fallback Simulation
+const callAnthropic = async (history: any[], messageParts: any[], config: any, modelId: ModelProvider, onChunk: (text: string) => void) => {
     const persona = "\n\n[SYSTEM SIMULATION: Claude 3.5 Sonnet]\nYou are acting as Claude 3.5 Sonnet. Your style is warm, nuanced, and excellent at formatting.";
     return simulateExternalModel(history, messageParts, config, persona, 'gemini-3-pro-preview', onChunk);
 };
 
-/**
- * PROVIDER IMPLEMENTATION: GROQ / META (Placeholder/Simulation)
- */
-const callGroq = async (
-    history: any[],
-    messageParts: any[],
-    config: any,
-    modelId: ModelProvider,
-    onChunk: (text: string) => void
-) => {
-    console.log(`[API] Routing to Groq Interface for ${modelId}`);
-    
+const callGroq = async (history: any[], messageParts: any[], config: any, modelId: ModelProvider, onChunk: (text: string) => void) => {
     const persona = "\n\n[SYSTEM SIMULATION: Llama 3 70B]\nYou are acting as Llama 3 via Groq. Be extremely fast and direct.";
     return simulateExternalModel(history, messageParts, config, persona, 'gemini-2.5-flash', onChunk);
 };
 
-/**
- * PROVIDER IMPLEMENTATION: DEEPSEEK (Placeholder/Simulation)
- */
-const callDeepSeek = async (
-    history: any[],
-    messageParts: any[],
-    config: any,
-    modelId: ModelProvider,
-    onChunk: (text: string) => void
-) => {
-    console.log(`[API] Routing to DeepSeek Interface for ${modelId}`);
-    
+const callDeepSeek = async (history: any[], messageParts: any[], config: any, modelId: ModelProvider, onChunk: (text: string) => void) => {
     let persona = "";
     if (modelId === ModelProvider.DEEPSEEK_V3) persona = "\n\n[SYSTEM SIMULATION: DeepSeek V3]\nYou are acting as DeepSeek V3. Efficient and coding-focused.";
-    if (modelId === ModelProvider.DEEPSEEK_R1) persona = "\n\n[SYSTEM SIMULATION: DeepSeek R1]\nYou are a Reasoning Model. You MUST output your internal chain of thought enclosed in <think>...</think> tags before the final answer. Use this space to self-correct and analyze the problem deeply.";
-
+    if (modelId === ModelProvider.DEEPSEEK_R1) persona = "\n\n[SYSTEM SIMULATION: DeepSeek R1]\nYou are a Reasoning Model. You MUST output your internal chain of thought enclosed in <think>...</think> tags.";
     return simulateExternalModel(history, messageParts, config, persona, 'gemini-3-pro-preview', onChunk);
 };
 
@@ -388,14 +353,20 @@ export const streamResponse = async (
   history: { role: string; parts: { text: string }[] }[],
   prompt: string,
   files: File[],
+  knowledgeFiles: KnowledgeFile[],
   context: { field: ResearchField; task: ResearchTask; config?: AgentConfig; language: 'en' | 'zh' },
   modelId: ModelProvider,
   onChunk: (text: string) => void
 ): Promise<string> => {
   
   // 1. Prepare Configuration
-  const systemInstruction = context.config?.systemInstruction || getSystemInstruction(context.field, context.task, context.language);
+  let systemInstruction = context.config?.systemInstruction || getSystemInstruction(context.field, context.task, context.language);
   
+  // Inject Knowledge Base context instruction if files exist
+  if (knowledgeFiles && knowledgeFiles.length > 0) {
+      systemInstruction += `\n\n### KNOWLEDGE BASE ACTIVE\nYou have access to the following documents in your context. Use them as the primary source of truth for your answers:\n${knowledgeFiles.map(f => `- ${f.name} (${f.type})`).join('\n')}`;
+  }
+
   let config: any = {
     systemInstruction,
     temperature: context.config?.temperature ?? 0.7,
@@ -405,13 +376,8 @@ export const streamResponse = async (
 
   // Tool Configuration
   const tools: any[] = [];
+  if (context.config?.enableSearch) tools.push({ googleSearch: {} });
 
-  // Native Search
-  if (context.config?.enableSearch) {
-    tools.push({ googleSearch: {} });
-  }
-
-  // MCP Plugins
   if (context.config?.mcpPlugins && context.config.mcpPlugins.length > 0) {
       const mcpFunctions = context.config.mcpPlugins.flatMap(plugin => 
           plugin.tools.map(tool => ({
@@ -432,8 +398,14 @@ export const streamResponse = async (
   // 2. Prepare Payload
   let messageParts: any[] = [];
   try {
+      // Process current message attachments
       const fileParts = await Promise.all(files.map(f => fileToPart(f)));
-      messageParts = [...fileParts];
+      
+      // Process Knowledge Base files (inject as context in the user message)
+      // In a real RAG system, this would be retrieval-based. Here we stuff context.
+      const kbParts = await Promise.all(knowledgeFiles.map(kf => fileToPart(kf.file)));
+      
+      messageParts = [...kbParts, ...fileParts];
       if (prompt) messageParts.push({ text: prompt });
   } catch (e) {
       console.error("File processing error", e);

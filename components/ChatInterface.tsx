@@ -1,12 +1,13 @@
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle, Globe, Settings, Bot, Menu } from 'lucide-react';
+import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle, Globe, Settings, Bot, Menu, BookOpen, UploadCloud, Film, Music, File } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
-import { ChatMessage, UserContext, ModelProvider, AgentConfig, MCPPlugin, MCPTool, MultiModelResponse, ResearchField, ResearchTask, ChatSession } from '../types';
+import { ChatMessage, UserContext, ModelProvider, AgentConfig, MCPPlugin, MCPTool, MultiModelResponse, ResearchField, ResearchTask, ChatSession, KnowledgeFile } from '../types';
 import { streamResponse } from '../services/geminiService';
 
 interface ChatInterfaceProps {
@@ -29,6 +30,9 @@ const TRANSLATIONS = {
         export: "Export Conversation",
         config: "Configuration",
         settings: "Settings",
+        knowledgeBase: "Knowledge Base",
+        uploadToKB: "Upload to Knowledge Base",
+        kbDesc: "Upload PDFs, images, or audio to build a persistent context for this session.",
         messagePlaceholder: "Message ProtoChat...",
         askQuestion: "Ask a research question... (Ctrl + Enter to send)",
         send: "Send",
@@ -45,7 +49,8 @@ const TRANSLATIONS = {
         selectModels: "Select up to 3 Models",
         ready: "Ready to research.",
         selectEngine: "Select Engine",
-        chars: "chars"
+        chars: "chars",
+        files: "files"
     },
     zh: {
         activeCluster: "选择模型引擎",
@@ -54,6 +59,9 @@ const TRANSLATIONS = {
         export: "导出对话",
         config: "系统配置",
         settings: "设置",
+        knowledgeBase: "个人知识库",
+        uploadToKB: "上传至知识库",
+        kbDesc: "上传 PDF、图片或音频，为此会话构建持久上下文。",
         messagePlaceholder: "发送给 ProtoChat...",
         askQuestion: "输入研究问题... (Ctrl + Enter 发送)",
         send: "发送",
@@ -70,7 +78,8 @@ const TRANSLATIONS = {
         selectModels: "最多选择 3 个模型",
         ready: "准备开始研究。",
         selectEngine: "选择引擎",
-        chars: "字符"
+        chars: "字符",
+        files: "文件"
     }
 };
 
@@ -357,7 +366,7 @@ const MessageBubble: React.FC<{
   );
 };
 
-// 4. Compact Model Dropdown (Upward)
+// 4. Compact Model Dropdown
 const ChatModelDropdown: React.FC<{
   activeModels: ModelProvider[],
   setActiveModels: (models: ModelProvider[]) => void,
@@ -390,14 +399,6 @@ const ChatModelDropdown: React.FC<{
     const names = activeModels.map(id => {
         const m = AVAILABLE_MODELS.find(mod => mod.id === id);
         if (!m) return "";
-        if (m.name.includes("Flash")) return "Flash";
-        if (m.name.includes("Pro")) return "Pro";
-        if (m.name.includes("Thinking")) return "Thinking";
-        if (m.name.includes("GPT")) return "GPT-4o";
-        if (m.name.includes("o1")) return "o1";
-        if (m.name.includes("Claude")) return "Claude";
-        if (m.name.includes("Llama")) return "Llama";
-        if (m.name.includes("DeepSeek")) return "DeepSeek";
         return m.name.split(" ")[0];
     });
     return names.join(" + ");
@@ -429,7 +430,6 @@ const ChatModelDropdown: React.FC<{
               >
                  <div className="flex flex-col text-left">
                     <span className={`text-xs font-semibold ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>{model.name}</span>
-                    <span className="text-[10px] text-gray-500 dark:text-gray-600 truncate max-w-[160px]">{model.desc}</span>
                  </div>
                  {isSelected && <Check size={14} className={`text-${themeColor}-600 dark:text-${themeColor}-400`} />}
               </button>
@@ -448,7 +448,7 @@ const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext
     const [input, setInput] = useState("");
     const [files, setFiles] = useState<File[]>([]);
     
-    // Active Models State for this session
+    // Knowledge Base files handled at parent level but we need to reference them for sending
     const [activeModels, setActiveModels] = useState<ModelProvider[]>(context.models);
 
     // Sync state changes to parent (Sidebar history)
@@ -458,7 +458,7 @@ const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext
         }
     }, [history, activeModels]);
 
-    const handleSubmit = async (e?: React.FormEvent) => {
+    const handleSubmit = async (e?: React.FormEvent, knowledgeBaseFiles: KnowledgeFile[] = []) => {
         if (e) e.preventDefault();
         if ((!input.trim() && files.length === 0) || isLoading) return;
 
@@ -507,6 +507,7 @@ const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext
                     modelHistory,
                     userMsg.content,
                     files,
+                    knowledgeBaseFiles,
                     {
                         field: context.field || ResearchField.GENERAL,
                         task: context.task || ResearchTask.DEEP_SEARCH,
@@ -562,10 +563,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
   
   const [artifact, setArtifact] = useState<{content: string, type: 'svg'|'html'|'react'|'pdb'|'mermaid'}|null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isKbOpen, setIsKbOpen] = useState(false); // Knowledge Base Drawer State
+  const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeFile[]>(initialSessionData?.knowledgeBase || []);
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(context.config || { temperature: 0.7, topP: 0.95, mcpPlugins: [] });
 
   const t = context.language === 'zh' ? TRANSLATIONS.zh : TRANSLATIONS.en;
-
   const bottomRef = useRef<HTMLDivElement>(null);
   
   // Use session1 as the primary session that syncs with parent (sidebar history)
@@ -583,8 +585,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
       if (initialSessionData) {
           session1.setHistory(initialSessionData.history);
           if (initialSessionData.activeModels) session1.setActiveModels(initialSessionData.activeModels);
+          if (initialSessionData.knowledgeBase) setKnowledgeBase(initialSessionData.knowledgeBase);
       }
   }, [initialSessionData?.id]);
+
+  // Sync KB changes back to session
+  useEffect(() => {
+      if (onUpdateSession && initialSessionData) {
+          onUpdateSession({ knowledgeBase });
+      }
+  }, [knowledgeBase]);
+
+  const handleUploadToKB = (files: File[]) => {
+      const newFiles: KnowledgeFile[] = files.map(f => ({
+          id: Date.now() + Math.random().toString(),
+          name: f.name,
+          type: f.type,
+          file: f,
+          timestamp: Date.now()
+      }));
+      setKnowledgeBase(prev => [...prev, ...newFiles]);
+  };
 
   const handleFork = (msgId: string, fromSession: number) => {
       if (isSplit) return; 
@@ -655,9 +676,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                         <Bot size={18} className={`text-${themeColor}-600 dark:text-${themeColor}-400`} />
                         ProtoChat <span className="text-gray-400">/</span> {context.field}
                     </h1>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500 uppercase tracking-wider">
-                         <span>{isSplit ? t.splitView : t.singleSession}</span>
-                    </div>
                 </div>
             </div>
             
@@ -670,6 +688,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                     <Globe size={18}/> {context.language === 'en' ? 'EN' : 'ZH'}
                 </button>
                 <div className="hidden md:block w-px h-6 bg-gray-200 dark:bg-white/10 mx-2" />
+                
+                {/* Knowledge Base Toggle */}
+                <button 
+                    onClick={() => { setIsKbOpen(true); setIsSettingsOpen(false); }}
+                    className={`p-2 rounded-lg transition-colors relative ${isKbOpen ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                    title={t.knowledgeBase}
+                >
+                    <BookOpen size={18}/>
+                    {knowledgeBase.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500"></span>}
+                </button>
+
                 <button onClick={() => isSplit ? setPanes([1]) : null} className={`hidden md:block p-2 rounded-lg ${!isSplit ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
                     <MessageSquare size={18}/>
                 </button>
@@ -679,7 +708,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                 <button onClick={() => handleExport(activeSession.history)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white" title={t.export}>
                     <Download size={18}/>
                 </button>
-                <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white" title={t.settings}>
+                <button onClick={() => { setIsSettingsOpen(true); setIsKbOpen(false); }} className={`p-2 rounded-lg transition-colors ${isSettingsOpen ? `bg-${themeColor}-100 dark:bg-${themeColor}-600 text-${themeColor}-700 dark:text-white` : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`} title={t.settings}>
                     <Settings size={18}/>
                 </button>
             </div>
@@ -770,7 +799,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                         onChange={(e) => activeSession.setInput(e.target.value)}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                activeSession.handleSubmit(e);
+                                activeSession.handleSubmit(e, knowledgeBase);
                             }
                         }}
                         placeholder={isSplit ? (activePaneIdx === 0 ? "Message Left Pane..." : "Message Right Pane...") : t.askQuestion}
@@ -780,7 +809,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
                 </div>
 
                 <button 
-                    onClick={activeSession.handleSubmit}
+                    onClick={(e) => activeSession.handleSubmit(e, knowledgeBase)}
                     disabled={activeSession.isLoading || (!activeSession.input.trim() && activeSession.files.length === 0)}
                     className={`p-3 rounded-xl transition-all ${activeSession.isLoading ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500' : `bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white shadow-lg shadow-${themeColor}-500/20`}`}
                 >
@@ -795,6 +824,74 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
       {artifact && (
           <div className="absolute inset-y-0 right-0 w-[400px] z-40 shadow-2xl animate-in slide-in-from-right duration-300">
               <ArtifactRenderer content={artifact.content} type={artifact.type} onClose={() => setArtifact(null)} t={t} />
+          </div>
+      )}
+
+      {/* RIGHT: Knowledge Base Drawer */}
+      {isKbOpen && (
+          <div className="absolute inset-y-0 right-0 w-80 bg-white dark:bg-[#0f0f11] border-l border-gray-200 dark:border-white/10 z-50 p-6 flex flex-col shadow-2xl animate-in slide-in-from-right">
+              <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><BookOpen size={18}/> {t.knowledgeBase}</h2>
+                  <button onClick={() => setIsKbOpen(false)}><X size={18} className="text-gray-400 hover:text-gray-900 dark:hover:text-white"/></button>
+              </div>
+              
+              <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-lg text-xs text-blue-700 dark:text-blue-300 mb-6 border border-blue-100 dark:border-blue-800">
+                  {t.kbDesc}
+              </div>
+
+              {/* Upload Area */}
+              <div className="mb-6">
+                  <input 
+                      type="file" 
+                      id="kb-upload" 
+                      className="hidden" 
+                      multiple 
+                      accept=".pdf,.png,.jpg,.jpeg,.mp3,.wav,.mp4"
+                      onChange={(e) => {
+                          if (e.target.files) handleUploadToKB(Array.from(e.target.files));
+                          e.target.value = ''; // Reset input
+                      }}
+                  />
+                  <button 
+                    onClick={() => document.getElementById('kb-upload')?.click()}
+                    className={`w-full py-3 border-2 border-dashed border-gray-300 dark:border-white/20 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-500 hover:border-${themeColor}-500 hover:text-${themeColor}-500 transition-colors`}
+                  >
+                      <UploadCloud size={24}/>
+                      <span className="text-sm font-semibold">{t.uploadToKB}</span>
+                  </button>
+              </div>
+
+              {/* File List */}
+              <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
+                  {knowledgeBase.length === 0 && (
+                      <div className="text-center text-gray-400 italic text-sm py-10">No documents.</div>
+                  )}
+                  {knowledgeBase.map((kbFile) => {
+                      let Icon = FileText;
+                      if (kbFile.type.startsWith('image/')) Icon = ImageIcon;
+                      if (kbFile.type.startsWith('audio/')) Icon = Music;
+                      if (kbFile.type.startsWith('video/')) Icon = Film;
+                      if (kbFile.type === 'application/pdf') Icon = File;
+
+                      return (
+                          <div key={kbFile.id} className="p-3 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 rounded-lg flex items-center gap-3 group">
+                              <div className={`p-2 rounded bg-${themeColor}-100 dark:bg-${themeColor}-900/30 text-${themeColor}-600 dark:text-${themeColor}-400`}>
+                                  <Icon size={16}/>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{kbFile.name}</div>
+                                  <div className="text-[10px] text-gray-500 uppercase">{kbFile.type.split('/')[1] || 'FILE'}</div>
+                              </div>
+                              <button 
+                                onClick={() => setKnowledgeBase(prev => prev.filter(f => f.id !== kbFile.id))}
+                                className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                              >
+                                  <X size={14}/>
+                              </button>
+                          </div>
+                      );
+                  })}
+              </div>
           </div>
       )}
 

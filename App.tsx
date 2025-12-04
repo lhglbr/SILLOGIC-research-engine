@@ -1,9 +1,10 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
-import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext, ChatSession } from './types';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout, PanelLeftClose } from 'lucide-react';
+import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext, ChatSession, AuthStrategy } from './types';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LoginScreen } from './components/Login';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout, PanelLeftClose, LogOut, User } from 'lucide-react';
 
 // --- Localization Resources ---
 
@@ -31,6 +32,8 @@ const APP_TEXT = {
     history: "History",
     noHistory: "No saved sessions",
     today: "Today",
+    logout: "Sign Out",
+    profile: "Profile"
   },
   zh: {
     landingTitle: "ProtoChat",
@@ -55,6 +58,8 @@ const APP_TEXT = {
     history: "历史记录",
     noHistory: "暂无历史记录",
     today: "今天",
+    logout: "退出登录",
+    profile: "个人资料"
   }
 };
 
@@ -305,70 +310,116 @@ const Sidebar: React.FC<{
   toggleTheme: () => void;
   toggleLang: () => void;
   themeColor: string;
-}> = ({ isOpen, setIsOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, lang, isDarkMode, toggleTheme, toggleLang, themeColor }) => {
+  fieldConfig: any;
+}> = ({ isOpen, setIsOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, lang, isDarkMode, toggleTheme, toggleLang, themeColor, fieldConfig }) => {
     const txt = APP_TEXT[lang];
     const sessionList = (Object.values(sessions) as ChatSession[]).sort((a, b) => b.timestamp - a.timestamp);
+    const { user, logout, strategy } = useAuth();
 
     return (
-        <div className={`fixed inset-y-0 left-0 z-40 bg-gray-100/95 dark:bg-[#0c0c0e]/95 backdrop-blur-xl border-r border-gray-200 dark:border-white/10 transition-transform duration-300 flex flex-col w-72 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
-            <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between gap-2">
-                <button 
-                    onClick={onNewChat}
-                    className={`flex-1 py-2 px-3 bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white rounded-lg flex items-center justify-center gap-2 transition-colors font-semibold shadow-lg shadow-${themeColor}-500/20`}
-                >
-                    <Plus size={18} />
-                    <span className="text-sm">{txt.newChat}</span>
-                </button>
-                <button 
-                    onClick={() => setIsOpen(false)} 
-                    className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500"
-                >
-                    <PanelLeftClose size={18} />
-                </button>
-            </div>
+        <>
+            {/* Backdrop for mobile closing */}
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm md:hidden"
+                    onClick={() => setIsOpen(false)}
+                />
+            )}
             
-            <div className="flex-1 overflow-y-auto p-2">
-                <div className="text-xs font-bold text-gray-500 uppercase px-2 mb-2 mt-2">{txt.history}</div>
-                {sessionList.length === 0 ? (
-                    <div className="text-center text-gray-400 dark:text-gray-600 text-sm py-4">{txt.noHistory}</div>
-                ) : (
-                    sessionList.map(session => (
-                        <div 
-                            key={session.id}
-                            onClick={() => {
-                                onSelectSession(session.id);
-                                if (window.innerWidth < 768) setIsOpen(false); // Auto close on mobile
-                            }}
-                            className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors mb-1 ${session.id === currentSessionId ? `bg-gray-200 dark:bg-white/10 text-gray-900 dark:text-white` : 'hover:bg-gray-200 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400'}`}
-                        >
-                            <MessageSquare size={16} className="shrink-0" />
-                            <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{session.title || txt.newChat}</div>
-                                <div className="text-[10px] opacity-60 truncate">{new Date(session.timestamp).toLocaleDateString()}</div>
-                            </div>
-                            <button 
-                                onClick={(e) => onDeleteSession(session.id, e)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 hover:text-red-500 rounded transition-all"
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        </div>
-                    ))
-                )}
-            </div>
+            <div className={`fixed inset-y-0 left-0 z-40 bg-gray-100/95 dark:bg-[#0c0c0e]/95 backdrop-blur-xl border-r border-gray-200 dark:border-white/10 transition-transform duration-300 flex flex-col w-72 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+                {/* User Profile Section */}
+                <div className="p-4 bg-gray-200/50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10">
+                   <div className="flex items-center gap-3 mb-3">
+                       {user?.avatar ? (
+                           <img src={user.avatar} className="w-10 h-10 rounded-full border border-gray-300 dark:border-white/20" alt="Avatar"/>
+                       ) : (
+                           <div className={`w-10 h-10 rounded-full bg-${themeColor}-600 flex items-center justify-center text-white font-bold`}>
+                               {user?.name?.[0] || 'U'}
+                           </div>
+                       )}
+                       <div className="min-w-0 flex-1">
+                           <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{user?.name}</div>
+                           <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
+                               {strategy === AuthStrategy.LOCAL ? 'DEMO USER' : strategy}
+                           </div>
+                       </div>
+                   </div>
+                   <button 
+                       onClick={() => logout()}
+                       className="w-full py-1.5 rounded bg-gray-300/50 dark:bg-white/5 hover:bg-red-500 hover:text-white dark:hover:bg-red-900/50 transition-colors text-xs font-semibold text-gray-600 dark:text-gray-300 flex items-center justify-center gap-2"
+                   >
+                       <LogOut size={12}/> {txt.logout}
+                   </button>
+                </div>
 
-            <div className="p-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
-                <ThemeToggle isDarkMode={isDarkMode} toggle={toggleTheme} />
-                <LanguageToggle lang={lang} toggle={toggleLang} />
+                <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between gap-2">
+                    <button 
+                        onClick={onNewChat}
+                        className={`flex-1 py-2 px-3 bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white rounded-lg flex items-center justify-center gap-2 transition-colors font-semibold shadow-lg shadow-${themeColor}-500/20`}
+                    >
+                        <Plus size={18} />
+                        <span className="text-sm">{txt.newChat}</span>
+                    </button>
+                    <button 
+                        onClick={() => setIsOpen(false)} 
+                        className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500"
+                    >
+                        <PanelLeftClose size={18} />
+                    </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-2">
+                    <div className="text-xs font-bold text-gray-500 uppercase px-2 mb-2 mt-2">{txt.history}</div>
+                    {sessionList.length === 0 ? (
+                        <div className="text-center text-gray-400 dark:text-gray-600 text-sm py-4">{txt.noHistory}</div>
+                    ) : (
+                        sessionList.map(session => {
+                            const sField = session.field ? fieldConfig[session.field] : fieldConfig[ResearchField.GENERAL];
+                            return (
+                                <div 
+                                    key={session.id}
+                                    onClick={() => {
+                                        onSelectSession(session.id);
+                                        if (window.innerWidth < 768) setIsOpen(false); // Auto close on mobile
+                                    }}
+                                    className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors mb-1 ${session.id === currentSessionId ? `bg-gray-200 dark:bg-white/10 text-gray-900 dark:text-white` : 'hover:bg-gray-200 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400'}`}
+                                >
+                                    <div className={`shrink-0 p-1.5 rounded-md bg-${sField.color}-100 dark:bg-${sField.color}-900/30 text-${sField.color}-600 dark:text-${sField.color}-400`}>
+                                        <sField.icon size={14} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-medium truncate">{session.title || txt.newChat}</div>
+                                        <div className="text-[10px] opacity-60 truncate flex items-center gap-1">
+                                            <span>{new Date(session.timestamp).toLocaleDateString()}</span>
+                                            <span>•</span>
+                                            <span>{sField.label}</span>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={(e) => onDeleteSession(session.id, e)}
+                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 hover:text-red-500 rounded transition-all"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
+                    <ThemeToggle isDarkMode={isDarkMode} toggle={toggleTheme} />
+                    <LanguageToggle lang={lang} toggle={toggleLang} />
+                </div>
             </div>
-        </div>
+        </>
     );
 };
 
 
-// --- Main App Component ---
+// --- Main App Content (Inner) ---
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.LANDING);
   const [context, setContext] = useState<UserContext>({
     models: [ModelProvider.GEMINI_FLASH],
@@ -381,12 +432,39 @@ const App: React.FC = () => {
   const [sessions, setSessions] = useState<Record<string, ChatSession>>({});
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
+  const { isAuthenticated, isLoading } = useAuth();
+
   // Dynamic Configs based on Language
   const fieldConfig = useMemo(() => getFieldConfig(context.language), [context.language]);
   const modelsList = useMemo(() => getModelsList(context.language), [context.language]);
   const txt = APP_TEXT[context.language];
 
   const activeTheme = context.field ? fieldConfig[context.field] : fieldConfig[ResearchField.GENERAL];
+
+  // --- Auth Gating ---
+  if (isLoading) {
+      return (
+          <div className="w-full h-screen bg-black flex items-center justify-center text-blue-500">
+             <div className="flex flex-col items-center gap-4">
+                 <div className="w-12 h-12 border-t-4 border-blue-500 rounded-full animate-spin"></div>
+                 <div className="font-mono text-xs tracking-widest uppercase">Initializing Secure Session</div>
+             </div>
+          </div>
+      );
+  }
+
+  if (!isAuthenticated) {
+      return (
+        <div className={isDarkMode ? 'dark' : ''}>
+          <LoginScreen 
+            isDarkMode={isDarkMode}
+            toggleTheme={() => setIsDarkMode(!isDarkMode)}
+            lang={context.language}
+            toggleLang={() => setContext(prev => ({ ...prev, language: prev.language === 'en' ? 'zh' : 'en' }))}
+          />
+        </div>
+      );
+  }
 
   const toggleModel = (modelId: ModelProvider) => {
     setContext(prev => {
@@ -414,7 +492,10 @@ const App: React.FC = () => {
           title: "New Research",
           timestamp: Date.now(),
           history: [],
-          activeModels: context.models
+          activeModels: context.models,
+          field: context.field, // Save context to session
+          task: context.task,
+          knowledgeBase: [] // Initialize empty KB
       };
       setSessions(prev => ({ ...prev, [newId]: newSession }));
       setActiveSessionId(newId);
@@ -425,7 +506,6 @@ const App: React.FC = () => {
           const session = prev[id];
           if (!session) return prev;
           
-          // Generate title from first user message if generic
           let title = session.title;
           if (data.history && data.history.length > 0 && session.title === "New Research") {
               const firstUserMsg = data.history.find(m => m.role === 'user');
@@ -450,6 +530,20 @@ const App: React.FC = () => {
       });
       if (activeSessionId === id) {
           setActiveSessionId(null);
+      }
+  };
+
+  // Switch session and restore context (field/task/models)
+  const handleSelectSession = (id: string) => {
+      const session = sessions[id];
+      if (session) {
+          setActiveSessionId(id);
+          setContext(prev => ({
+              ...prev,
+              field: session.field || prev.field,
+              task: session.task || prev.task,
+              models: session.activeModels || prev.models
+          }));
       }
   };
 
@@ -508,6 +602,8 @@ const App: React.FC = () => {
               key={fieldKey}
               onClick={() => {
                 setContext({ ...context, field: fieldKey });
+                // Reset active session so we start fresh for this new field
+                setActiveSessionId(null);
                 setView(AppView.TASK_SELECT);
               }}
               className={`group glass-panel p-6 rounded-xl transition-all text-left flex items-start gap-4 border dark:border-white/5 border-black/5 hover:${config.borderClass} hover:bg-white/40 dark:hover:bg-white/5`}
@@ -609,7 +705,7 @@ const App: React.FC = () => {
         
         {/* Global Controls - Only visible when NOT in workspace */}
         {view !== AppView.WORKSPACE && (
-            <div className="fixed top-1/2 left-6 -translate-y-1/2 z-50 flex flex-col gap-2">
+            <div className="fixed left-6 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2">
                 <ThemeToggle isDarkMode={isDarkMode} toggle={() => setIsDarkMode(!isDarkMode)} />
                 <LanguageToggle lang={context.language} toggle={toggleLanguage} />
             </div>
@@ -628,7 +724,7 @@ const App: React.FC = () => {
                 setIsOpen={setSidebarOpen}
                 sessions={sessions}
                 currentSessionId={activeSessionId || ''}
-                onSelectSession={setActiveSessionId}
+                onSelectSession={handleSelectSession}
                 onNewChat={createNewSession}
                 onDeleteSession={deleteSession}
                 lang={context.language}
@@ -636,15 +732,8 @@ const App: React.FC = () => {
                 toggleTheme={() => setIsDarkMode(!isDarkMode)}
                 toggleLang={toggleLanguage}
                 themeColor={activeTheme.color}
+                fieldConfig={fieldConfig}
             />
-
-            {/* Backdrop for mobile only - allows click-outside to close */}
-            {sidebarOpen && (
-                <div 
-                    className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm md:hidden"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
 
             {/* Chat Interface - Pushed by Sidebar on Desktop, Full width on Mobile */}
             <div className={`flex-1 flex flex-col h-full transition-all duration-300 w-full ${sidebarOpen ? 'md:ml-72' : 'ml-0'}`}>
@@ -672,5 +761,14 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+// --- App Wrapper with Providers ---
+const App: React.FC = () => {
+    return (
+        <AuthProvider>
+            <AppContent />
+        </AuthProvider>
+    )
+}
 
 export default App;

@@ -60,12 +60,23 @@ export interface ChatMessage {
   multiResponses?: MultiModelResponse[];
 }
 
+export interface KnowledgeFile {
+  id: string;
+  name: string;
+  type: string;
+  file: File;
+  timestamp: number;
+}
+
 export interface ChatSession {
   id: string;
   title: string;
   timestamp: number;
   history: ChatMessage[];
   activeModels: ModelProvider[];
+  field?: ResearchField;
+  task?: ResearchTask;
+  knowledgeBase: KnowledgeFile[];
 }
 
 // --- MCP Definitions ---
@@ -101,4 +112,30 @@ export interface UserContext {
   models: ModelProvider[];
   config?: AgentConfig;
   language: 'en' | 'zh';
+}
+
+// --- Auth Definitions ---
+export enum AuthStrategy {
+  LOCAL = 'LOCAL',         // Demo/Dev mode
+  CLERK = 'CLERK',         // Clerk.com
+  NEXT_AUTH = 'NEXT_AUTH'  // NextAuth.js (Auth.js)
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role?: 'admin' | 'researcher' | 'viewer';
+}
+
+export interface AuthState {
+  user: UserProfile | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  strategy: AuthStrategy;
+  config: {
+    clerkKey?: string;
+    nextAuthUrl?: string;
+  };
 }

@@ -4,6 +4,7 @@ import { ResearchField } from '../types';
 
 interface ParticleBackgroundProps {
   field?: ResearchField;
+  themeColor?: string; // Explicit color override (e.g., 'blue', 'violet')
   isDarkMode: boolean;
 }
 
@@ -17,7 +18,17 @@ const FIELD_COLORS: Record<string, { r: number, g: number, b: number }> = {
   [ResearchField.GENERAL]: { r: 0.2, g: 0.4, b: 1.0 },     // Blue (Default)
 };
 
-const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field, isDarkMode }) => {
+// Map explicit color names to RGB
+const THEME_RGB: Record<string, { r: number, g: number, b: number }> = {
+  violet: { r: 0.5, g: 0.0, b: 1.0 },
+  emerald: { r: 0.0, g: 1.0, b: 0.4 },
+  cyan: { r: 0.0, g: 0.8, b: 1.0 },
+  amber: { r: 1.0, g: 0.6, b: 0.0 },
+  rose: { r: 1.0, g: 0.2, b: 0.5 },
+  blue: { r: 0.2, g: 0.4, b: 1.0 },
+};
+
+const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field, themeColor, isDarkMode }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const targetColorRef = useRef({ r: 0.2, g: 0.4, b: 1.0 });
 
@@ -27,13 +38,15 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ field, isDarkMo
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
 
   useEffect(() => {
-    // Update target color when field changes
-    if (field && FIELD_COLORS[field]) {
-      targetColorRef.current = FIELD_COLORS[field];
+    // Priority: Explicit Theme Color > Field Color > Default Blue
+    if (themeColor && THEME_RGB[themeColor]) {
+        targetColorRef.current = THEME_RGB[themeColor];
+    } else if (field && FIELD_COLORS[field]) {
+        targetColorRef.current = FIELD_COLORS[field];
     } else {
-      targetColorRef.current = FIELD_COLORS[ResearchField.GENERAL];
+        targetColorRef.current = THEME_RGB['blue'];
     }
-  }, [field]);
+  }, [field, themeColor]);
 
   // Update scene based on Dark Mode
   useEffect(() => {

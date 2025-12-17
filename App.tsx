@@ -1,13 +1,10 @@
-
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import ChatInterface from './components/ChatInterface';
 import { PricingModal } from './components/PricingModal';
 import { AppView, ResearchField, ResearchTask, ModelProvider, UserContext, ChatSession, AuthStrategy, SubscriptionTier } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LoginScreen } from './components/Login';
-import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout, PanelLeftClose, LogOut, User, Crown, Gem } from 'lucide-react';
+import { Atom, Microscope, Binary, Sigma, Users, Globe, ChevronRight, BrainCircuit, Sparkles, FileSearch, FileText, PenTool, BarChart, TestTube, Code, Feather, PieChart, Network, Check, ChevronDown, Cpu, Zap, Box, Wrench, Flame, MessageSquare, Hexagon, Grid, Layers, Moon, Sun, Languages, Plus, History, Menu, Trash2, Layout, PanelLeftClose, LogOut, User, Crown, Gem, Eraser } from 'lucide-react';
 
 // --- Localization Resources ---
 
@@ -35,10 +32,13 @@ const APP_TEXT = {
     history: "History",
     noHistory: "No saved sessions",
     today: "Today",
-    logout: "Sign Out",
+    logout: "Reset Session",
     profile: "Profile",
     upgrade: "Upgrade Plan",
-    plan: "Plan"
+    plan: "Plan",
+    clearHistory: "Clear All History",
+    confirmClear: "Are you sure you want to delete all chat history? This cannot be undone.",
+    storageFull: "Storage Quota Exceeded. Please delete some old chats."
   },
   zh: {
     landingTitle: "ProtoChat",
@@ -63,10 +63,13 @@ const APP_TEXT = {
     history: "历史记录",
     noHistory: "暂无历史记录",
     today: "今天",
-    logout: "退出登录",
+    logout: "重置会话",
     profile: "个人资料",
     upgrade: "升级方案",
-    plan: "方案"
+    plan: "方案",
+    clearHistory: "清空历史记录",
+    confirmClear: "确定要删除所有聊天记录吗？此操作无法撤销。",
+    storageFull: "本地存储空间已满，请删除旧的聊天记录。"
   }
 };
 
@@ -312,6 +315,7 @@ const Sidebar: React.FC<{
   onSelectSession: (id: string) => void;
   onNewChat: () => void;
   onDeleteSession: (id: string, e: React.MouseEvent) => void;
+  onClearHistory: () => void;
   lang: 'en' | 'zh';
   isDarkMode: boolean;
   toggleTheme: () => void;
@@ -319,7 +323,7 @@ const Sidebar: React.FC<{
   themeColor: string;
   fieldConfig: any;
   onUpgrade: () => void;
-}> = ({ isOpen, setIsOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, lang, isDarkMode, toggleTheme, toggleLang, themeColor, fieldConfig, onUpgrade }) => {
+}> = ({ isOpen, setIsOpen, sessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, onClearHistory, lang, isDarkMode, toggleTheme, toggleLang, themeColor, fieldConfig, onUpgrade }) => {
     const txt = APP_TEXT[lang];
     const sessionList = (Object.values(sessions) as ChatSession[]).sort((a, b) => b.timestamp - a.timestamp);
     const { user, logout, strategy } = useAuth();
@@ -396,12 +400,22 @@ const Sidebar: React.FC<{
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-2">
-                    <div className="text-xs font-bold text-gray-500 uppercase px-2 mb-2 mt-2">{txt.history}</div>
+                    <div className="flex items-center justify-between px-2 mb-2 mt-2">
+                         <div className="text-xs font-bold text-gray-500 uppercase">{txt.history}</div>
+                         {sessionList.length > 0 && (
+                             <button onClick={onClearHistory} className="text-gray-400 hover:text-red-500 transition-colors" title={txt.clearHistory}>
+                                 <Eraser size={12} />
+                             </button>
+                         )}
+                    </div>
                     {sessionList.length === 0 ? (
                         <div className="text-center text-gray-400 dark:text-gray-600 text-sm py-4">{txt.noHistory}</div>
                     ) : (
                         sessionList.map(session => {
                             const sField = session.field ? fieldConfig[session.field] : fieldConfig[ResearchField.GENERAL];
+                            // Use session color if we aren't overriding, otherwise use global override
+                            const sColor = sField.color; 
+                            
                             return (
                                 <div 
                                     key={session.id}
@@ -411,7 +425,7 @@ const Sidebar: React.FC<{
                                     }}
                                     className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors mb-1 ${session.id === currentSessionId ? `bg-gray-200 dark:bg-white/10 text-gray-900 dark:text-white` : 'hover:bg-gray-200 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400'}`}
                                 >
-                                    <div className={`shrink-0 p-1.5 rounded-md bg-${sField.color}-100 dark:bg-${sField.color}-900/30 text-${sField.color}-600 dark:text-${sField.color}-400`}>
+                                    <div className={`shrink-0 p-1.5 rounded-md bg-${sColor}-100 dark:bg-${sColor}-900/30 text-${sColor}-600 dark:text-${sColor}-400`}>
                                         <sField.icon size={14} />
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -453,12 +467,10 @@ const AppContent: React.FC = () => {
     language: 'en'
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [customTheme, setCustomTheme] = useState<string | null>(null);
+  
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
-
-  // Session Management
-  const [sessions, setSessions] = useState<Record<string, ChatSession>>({});
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const { isAuthenticated, isLoading, user } = useAuth();
 
@@ -467,7 +479,34 @@ const AppContent: React.FC = () => {
   const modelsList = useMemo(() => getModelsList(context.language), [context.language]);
   const txt = APP_TEXT[context.language];
 
-  const activeTheme = context.field ? fieldConfig[context.field] : fieldConfig[ResearchField.GENERAL];
+  // --- Session Management & Persistence ---
+  
+  // 1. Initialize from LocalStorage
+  const [sessions, setSessions] = useState<Record<string, ChatSession>>(() => {
+    try {
+        const saved = localStorage.getItem('protochat_sessions_v1');
+        return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+        console.error("Failed to load sessions from local storage", e);
+        return {};
+    }
+  });
+
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  // 2. Persist to LocalStorage on change
+  useEffect(() => {
+    try {
+        localStorage.setItem('protochat_sessions_v1', JSON.stringify(sessions));
+    } catch (e) {
+        console.error("Storage quota exceeded", e);
+        // Optional: Trigger a toast or alert here if needed
+    }
+  }, [sessions]);
+
+  // Theme Logic
+  const fieldTheme = context.field ? fieldConfig[context.field] : fieldConfig[ResearchField.GENERAL];
+  const activeThemeColor = customTheme || fieldTheme.color;
 
   // --- Auth Gating ---
   if (isLoading) {
@@ -480,19 +519,9 @@ const AppContent: React.FC = () => {
           </div>
       );
   }
-
-  if (!isAuthenticated) {
-      return (
-        <div className={isDarkMode ? 'dark' : ''}>
-          <LoginScreen 
-            isDarkMode={isDarkMode}
-            toggleTheme={() => setIsDarkMode(!isDarkMode)}
-            lang={context.language}
-            toggleLang={() => setContext(prev => ({ ...prev, language: prev.language === 'en' ? 'zh' : 'en' }))}
-          />
-        </div>
-      );
-  }
+  
+  // NOTE: Authentication check has been removed to bypass login screen. 
+  // AuthContext now initializes with a default user.
 
   const toggleModel = (modelId: ModelProvider) => {
     setContext(prev => {
@@ -561,6 +590,14 @@ const AppContent: React.FC = () => {
       }
   };
 
+  const clearAllHistory = () => {
+      if (window.confirm(txt.confirmClear)) {
+          setSessions({});
+          setActiveSessionId(null);
+          localStorage.removeItem('protochat_sessions_v1');
+      }
+  };
+
   // Switch session and restore context (field/task/models)
   const handleSelectSession = (id: string) => {
       const session = sessions[id];
@@ -572,6 +609,8 @@ const AppContent: React.FC = () => {
               task: session.task || prev.task,
               models: session.activeModels || prev.models
           }));
+          // Ensure we go to workspace if selecting from sidebar
+          setView(AppView.WORKSPACE);
       }
   };
 
@@ -655,8 +694,8 @@ const AppContent: React.FC = () => {
     <div className="h-screen flex flex-col items-center justify-center z-10 relative p-8">
       <div className="max-w-5xl w-full">
         <div className="flex items-center gap-3 mb-2">
-            <activeTheme.icon className={`text-${activeTheme.color}-600 dark:text-${activeTheme.color}-400`} size={28} />
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{activeTheme.label} {txt.workspaceTitle}</h2>
+            <fieldTheme.icon className={`text-${activeThemeColor}-600 dark:text-${activeThemeColor}-400`} size={28} />
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{fieldTheme.label} {txt.workspaceTitle}</h2>
         </div>
         <p className="text-gray-600 dark:text-gray-400 mb-8">{txt.selectToolSubtitle}</p>
         
@@ -666,14 +705,14 @@ const AppContent: React.FC = () => {
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-4">{txt.toolsTitle}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {activeTheme.tasks.map((task) => (
+              {fieldTheme.tasks.map((task) => (
                 <button
                   key={task.id}
                   onClick={() => setContext(prev => ({ ...prev, task: task.id }))}
-                  className={`glass-panel p-4 rounded-xl text-left transition-all border ${context.task === task.id ? `${activeTheme.bgClass} ${activeTheme.borderClass}` : 'dark:border-white/5 border-black/5 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                  className={`glass-panel p-4 rounded-xl text-left transition-all border ${context.task === task.id ? `dark:bg-${activeThemeColor}-900/20 bg-${activeThemeColor}-100/50 dark:border-${activeThemeColor}-500/50 border-${activeThemeColor}-500/30` : 'dark:border-white/5 border-black/5 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >
                   <div className="flex items-center gap-3 mb-2">
-                    <task.icon size={20} className={context.task === task.id ? `text-${activeTheme.color}-600 dark:text-${activeTheme.color}-400` : 'text-gray-500 dark:text-gray-400'} />
+                    <task.icon size={20} className={context.task === task.id ? `text-${activeThemeColor}-600 dark:text-${activeThemeColor}-400` : 'text-gray-500 dark:text-gray-400'} />
                     <span className="font-semibold text-gray-900 dark:text-white">{task.title}</span>
                   </div>
                   <p className="text-xs text-gray-500">{task.desc}</p>
@@ -692,7 +731,7 @@ const AppContent: React.FC = () => {
             <ModelDropdown 
               selectedModels={context.models} 
               onToggle={toggleModel} 
-              themeColor={activeTheme.color}
+              themeColor={activeThemeColor}
               lang={context.language}
               modelsList={modelsList}
             />
@@ -703,7 +742,7 @@ const AppContent: React.FC = () => {
                 const model = modelsList.find(m => m.id === mId);
                 return (
                   <div key={mId} className="flex items-center gap-2 p-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                    <div className={`w-2 h-2 rounded-full bg-${activeTheme.color}-500 shadow shadow-${activeTheme.color}-500/50`}></div>
+                    <div className={`w-2 h-2 rounded-full bg-${activeThemeColor}-500 shadow shadow-${activeThemeColor}-500/50`}></div>
                     <span className="text-xs text-gray-600 dark:text-gray-300 font-mono">{model?.name}</span>
                   </div>
                 )
@@ -717,7 +756,7 @@ const AppContent: React.FC = () => {
           <button 
             disabled={!context.task}
             onClick={handleLaunch}
-            className={`px-8 py-3 bg-${activeTheme.color}-600 hover:bg-${activeTheme.color}-500 disabled:bg-gray-300 disabled:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-500 text-white font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg`}
+            className={`px-8 py-3 bg-${activeThemeColor}-600 hover:bg-${activeThemeColor}-500 disabled:bg-gray-300 disabled:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-500 text-white font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg`}
           >
             {txt.launch} <ChevronRight size={18} />
           </button>
@@ -729,7 +768,7 @@ const AppContent: React.FC = () => {
   return (
     <div className={`${isDarkMode ? 'dark' : ''} h-full w-full`}>
       <div className="relative min-h-screen text-gray-900 dark:text-gray-100 font-sans selection:bg-blue-500/30 bg-gray-50 dark:bg-black transition-colors duration-500">
-        <ParticleBackground field={context.field} isDarkMode={isDarkMode} />
+        <ParticleBackground field={context.field} themeColor={activeThemeColor} isDarkMode={isDarkMode} />
         
         {showPricing && (
             <PricingModal 
@@ -763,11 +802,12 @@ const AppContent: React.FC = () => {
                 onSelectSession={handleSelectSession}
                 onNewChat={createNewSession}
                 onDeleteSession={deleteSession}
+                onClearHistory={clearAllHistory}
                 lang={context.language}
                 isDarkMode={isDarkMode}
                 toggleTheme={() => setIsDarkMode(!isDarkMode)}
                 toggleLang={toggleLanguage}
-                themeColor={activeTheme.color}
+                themeColor={activeThemeColor}
                 fieldConfig={fieldConfig}
                 onUpgrade={() => setShowPricing(true)}
             />
@@ -778,8 +818,11 @@ const AppContent: React.FC = () => {
                     <ChatInterface 
                         key={activeSessionId} // Forces remount when switching sessions
                         context={context} 
-                        themeColor={activeTheme.color}
+                        themeColor={activeThemeColor}
                         isDarkMode={isDarkMode}
+                        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+                        customTheme={customTheme}
+                        onSetCustomTheme={setCustomTheme}
                         initialSessionData={sessions[activeSessionId]}
                         onUpdateSession={(data) => updateSession(activeSessionId, data)}
                         onBack={() => setView(AppView.TASK_SELECT)} 

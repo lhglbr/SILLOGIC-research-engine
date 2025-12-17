@@ -1,7 +1,5 @@
-
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle, Globe, Settings, Bot, Menu, BookOpen, UploadCloud, Film, Music, File, Lock, Crown } from 'lucide-react';
+import { Send, RefreshCw, ChevronLeft, Paperclip, X, Download, FileText, BrainCircuit, Maximize2, Copy, Check, FileDown, Cpu, Zap, Sparkles, MessageSquare, Hexagon, Flame, Sliders, VolumeX, ChevronDown, ChevronUp, Lightbulb, Code, PanelRightOpen, PanelRightClose, Pencil, RotateCcw, Image as ImageIcon, GitBranch, Split, Columns, Layout, PanelLeftClose, Database, HardDrive, Github, Terminal, Plug, Dna, ZoomIn, ZoomOut, Move, StopCircle, Globe, Settings, Bot, Menu, BookOpen, UploadCloud, Film, Music, File, Lock, Crown, Palette, Sun, Moon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -16,6 +14,9 @@ interface ChatInterfaceProps {
   context: UserContext;
   themeColor: string;
   isDarkMode: boolean;
+  onToggleTheme: () => void;
+  customTheme: string | null;
+  onSetCustomTheme: (color: string | null) => void;
   initialSessionData?: ChatSession;
   onUpdateSession?: (data: Partial<ChatSession>) => void;
   onBack: () => void;
@@ -54,7 +55,12 @@ const TRANSLATIONS = {
         chars: "chars",
         files: "files",
         upgradeRequired: "Upgrade Required",
-        unlockModel: "Upgrade to Pro to unlock this model."
+        unlockModel: "Upgrade to Pro to unlock this model.",
+        appearance: "Appearance",
+        themeMode: "Theme Mode",
+        accentColor: "Accent Color",
+        autoColor: "Auto (Field Default)",
+        darkMode: "Dark Mode"
     },
     zh: {
         activeCluster: "选择模型引擎",
@@ -85,7 +91,12 @@ const TRANSLATIONS = {
         chars: "字符",
         files: "文件",
         upgradeRequired: "需要升级",
-        unlockModel: "升级至 Pro 版以解锁此模型。"
+        unlockModel: "升级至 Pro 版以解锁此模型。",
+        appearance: "外观",
+        themeMode: "主题模式",
+        accentColor: "主题色",
+        autoColor: "自动 (学科默认)",
+        darkMode: "深色模式"
     }
 };
 
@@ -117,6 +128,8 @@ const MOCK_MCP_PLUGINS: MCPPlugin[] = [
         tools: [{ name: 'github_list_issues', description: 'List issues', parameters: {} }]
     }
 ];
+
+const THEME_COLORS = ['blue', 'violet', 'emerald', 'amber', 'rose', 'cyan'];
 
 // --- Sub-Components ---
 
@@ -588,7 +601,7 @@ const useChatSession = (initialHistory: ChatMessage[] = [], context: UserContext
 
 // --- Main Component ---
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDarkMode, initialSessionData, onUpdateSession, onBack, onToggleLanguage, onToggleSidebar }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDarkMode, onToggleTheme, customTheme, onSetCustomTheme, initialSessionData, onUpdateSession, onBack, onToggleLanguage, onToggleSidebar }) => {
   const [panes, setPanes] = useState<number[]>([1]); 
   const [activePaneIdx, setActivePaneIdx] = useState(0);
   
@@ -949,6 +962,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, themeColor, isDa
               {/* Settings Controls */}
               <div className="space-y-6 overflow-y-auto flex-1 scrollbar-hide">
                   
+                  {/* Appearance Section */}
+                  <div className="border-b border-gray-200 dark:border-white/10 pb-6 mb-2">
+                       <label className="text-xs font-bold text-gray-500 uppercase block mb-3 flex items-center gap-2">
+                           <Palette size={14}/> {t.appearance}
+                       </label>
+                       
+                       {/* Dark Mode Toggle */}
+                       <div className="flex items-center justify-between mb-4">
+                            <span className="text-sm text-gray-700 dark:text-gray-300">{t.themeMode}</span>
+                            <button 
+                                onClick={onToggleTheme}
+                                className="p-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors flex items-center gap-2 text-sm"
+                            >
+                                {isDarkMode ? <><Moon size={14}/> {t.darkMode}</> : <><Sun size={14}/> Light Mode</>}
+                            </button>
+                       </div>
+
+                       {/* Color Theme Picker */}
+                       <div className="space-y-2">
+                            <span className="text-sm text-gray-700 dark:text-gray-300 block">{t.accentColor}</span>
+                            <div className="grid grid-cols-6 gap-2">
+                                {THEME_COLORS.map(color => (
+                                    <button
+                                        key={color}
+                                        onClick={() => onSetCustomTheme(color)}
+                                        className={`w-8 h-8 rounded-full bg-${color}-500 hover:scale-110 transition-transform relative border-2 ${customTheme === color ? 'border-white shadow-lg' : 'border-transparent'}`}
+                                    >
+                                        {customTheme === color && <Check size={12} className="text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"/>}
+                                    </button>
+                                ))}
+                            </div>
+                            <button 
+                                onClick={() => onSetCustomTheme(null)}
+                                className={`w-full py-2 mt-2 text-xs border border-dashed border-gray-300 dark:border-white/20 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${!customTheme ? 'text-gray-400' : 'text-blue-500'}`}
+                            >
+                                {t.autoColor}
+                            </button>
+                       </div>
+                  </div>
+
                   <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-2">{t.systemTemp}</label>
                       <div className="flex items-center gap-3">

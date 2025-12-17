@@ -7,6 +7,16 @@ import Cookies from 'js-cookie';
 // --- Default Configuration ---
 const DEFAULT_STRATEGY = AuthStrategy.LOCAL;
 
+// Default user to bypass login screen
+const DEFAULT_USER: UserProfile = {
+  id: 'guest-researcher',
+  name: 'Researcher',
+  email: 'researcher@lab.org',
+  role: 'researcher',
+  tier: SubscriptionTier.PRO, // Default to PRO to show all features
+  avatar: `https://api.dicebear.com/7.x/shapes/svg?seed=Researcher`
+};
+
 interface AuthContextType extends AuthState {
   login: (provider?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -88,7 +98,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [strategy, setStrategyState] = useState<AuthStrategy>(() => {
      try {
         const saved = Cookies.get('proto_auth_strategy');
-        // Fallback to LOCAL if cookie is missing or invalid to prevent crash loops
         return (saved as AuthStrategy) || DEFAULT_STRATEGY;
      } catch (e) {
         return DEFAULT_STRATEGY;
@@ -117,9 +126,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [localUser, setLocalUser] = useState<UserProfile | null>(() => {
      try {
          const saved = Cookies.get('proto_local_user');
-         return saved ? JSON.parse(saved) : null;
+         // Initialize with DEFAULT_USER if no user is saved, effectively bypassing login
+         return saved ? JSON.parse(saved) : DEFAULT_USER;
      } catch (e) {
-         return null;
+         return DEFAULT_USER;
      }
   });
 
@@ -145,6 +155,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Reset users on strategy switch
     if (newStrategy !== AuthStrategy.LOCAL) {
         setLocalUser(null);
+    } else {
+        // If switching back to local, ensure we have the default user
+        setLocalUser(DEFAULT_USER);
     }
     // Clear logout strategy when switching
     logoutStrategyRef.current = null;
@@ -176,8 +189,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setLocalUser(updated);
           Cookies.set('proto_local_user', JSON.stringify(updated));
       } 
-      // For adapters, the useEffect dependencies will catch the `subscriptionTier` change
-      // and update `adapterUser` automatically via the onUserSync callbacks.
   };
 
   // Unified actions
@@ -186,8 +197,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
      if (strategy === AuthStrategy.NEXT_AUTH) {
          await nextAuthSignIn(providerId);
      }
-     // Clerk handles login via its UI components
-     // Local login is handled by updateLocalUser directly
      setIsLoading(false);
   };
 
@@ -197,22 +206,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (logoutStrategyRef.current) {
             await logoutStrategyRef.current();
         } else {
-             // Fallback or Local
-             setLocalUser(null);
+             // For local strategy, "Logout" just resets to default user
+             setLocalUser(DEFAULT_USER);
              Cookies.remove('proto_local_user');
         }
         
-        // Ensure state is cleared
         if (strategy !== AuthStrategy.LOCAL) {
             setAdapterUser(null);
         } else {
-            setLocalUser(null);
+            setLocalUser(DEFAULT_USER);
         }
     } catch (e) {
         console.error("Logout failed", e);
-        // Force clear if strategy failed
         setAdapterUser(null);
-        setLocalUser(null);
+        setLocalUser(DEFAULT_USER);
     } finally {
         setIsLoading(false);
     }
@@ -227,8 +234,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Render Logic
   const renderProvider = () => {
-    // 1. CLERK
-    // Validate key format to prevent crashes (must allow trim() and start with 'pk_')
     const cleanClerkKey = authConfig.clerkKey ? authConfig.clerkKey.trim() : '';
     const isValidClerkKey = cleanClerkKey.startsWith('pk_');
 
@@ -242,8 +247,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
     }
     
-    // 2. NEXT AUTH
-    // Validate URL to prevent CLIENT_FETCH_ERROR
     const cleanNextAuthUrl = authConfig.nextAuthUrl ? authConfig.nextAuthUrl.trim() : '';
     const isValidNextAuthUrl = cleanNextAuthUrl.startsWith('http');
 
@@ -257,8 +260,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
     }
 
-    // Default: Local, or fallback if keys/urls are missing/invalid
-    // This allows the LoginScreen to render (unauthenticated) so users can fix the config
     return <>{children}</>;
   };
 
